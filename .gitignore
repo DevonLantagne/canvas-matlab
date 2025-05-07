@@ -1,0 +1,7 @@
+.env
+*.asv
+*.m~
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
