@@ -22,4 +22,4 @@ end
 %% Get Students
 fprintf("Getting Students...\n\n")
 
-students = canv.getStudents(ShowAvatar=true);
+students = canv.getStudents(GetAvatar=true);

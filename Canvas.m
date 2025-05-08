@@ -69,7 +69,7 @@ classdef Canvas
         function students = getStudents(obj, opts)
             arguments
                 obj (1,1) Canvas
-                opts.ShowAvatar (1,1) logical = false
+                opts.GetAvatar (1,1) logical = false
             end
             import matlab.net.*
             import matlab.net.http.*
@@ -83,7 +83,7 @@ classdef Canvas
                 QueryParameter('per_page', '100'), ...
                 QueryParameter('include[]', 'enrollments') ...
                 ];
-            if opts.ShowAvatar
+            if opts.GetAvatar
                 qs = [qs, QueryParameter('include[]', 'avatar_url')];
             end
             uri.Query = qs;
