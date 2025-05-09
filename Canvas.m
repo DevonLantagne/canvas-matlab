@@ -90,6 +90,12 @@ classdef Canvas
 
             students = getPayload(obj, uri);
 
+            % Modify data output by relocating enrollment section
+            for n = 1:length(students)
+                enroleCode = students(n).enrollments.sis_section_id;
+                students(n).section = extractAfter(enroleCode, '-');
+            end
+
         end
         function asmts = getAssignments(obj)
 

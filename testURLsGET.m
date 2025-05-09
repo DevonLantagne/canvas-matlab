@@ -23,3 +23,11 @@ end
 fprintf("Getting Students...\n\n")
 
 students = canv.getStudents(GetAvatar=true);
+
+% Display some basic info
+for i = 1:length(students)
+    fprintf('Name: %s  |  MSOEID: %s  |  Section: %s\n', ...
+        students(i).short_name, ...
+        students(i).section, ...
+        students(i).sis_user_id);
+end
