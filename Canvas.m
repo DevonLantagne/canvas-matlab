@@ -150,7 +150,7 @@ classdef Canvas
             %queries = uri.Query;
 
             while true
-                
+
                 resp = req.send(uri);
 
                 if resp.StatusCode ~= StatusCode.OK
@@ -160,10 +160,10 @@ classdef Canvas
                 %fprintf("Queries remaining: %d\n", double(resp.getFields("x-rate-limit-remaining").Value))
 
                 if isstruct(resp.Body.Data)
-                    data = Canvas.unionStructs(data, resp.Body.Data);
+                    data = unionStructs(data, resp.Body.Data);
                 elseif iscell(resp.Body.Data)
-                    S = Canvas.normalizeStruct(resp.Body.Data); % convert cell array of hetero structures
-                    data = Canvas.unionStructs(data, S); % append to existing assignments
+                    S = normalizeStruct(resp.Body.Data); % convert cell array of hetero structures
+                    data = unionStructs(data, S); % append to existing assignments
                 else
                     error("Unknown body data type.")
                 end
@@ -175,7 +175,7 @@ classdef Canvas
                 end
 
                 % Look for rel="next" in the Link header
-                links = Canvas.parseLinkHeader(linkHeader.Value);
+                links = parseLinkHeader(linkHeader.Value);
                 % Check if there is a 'next' field in structure
                 if ~isfield(links, 'next')
                     break;
@@ -187,86 +187,111 @@ classdef Canvas
         end
     end
 
-    methods (Static, Access = private)
+end
 
-        function links = parseLinkHeader(linkStr)
-            % Parses a Canvas-style Link header
-            % Returns a struct with rel names as fields: e.g., links.next, links.last
-            links = struct;
-            entries = strsplit(linkStr, ',');
+%% Helper Functions
+% These functions are encapsulated inside this .m file and cannot be
+% accessed outside the class.
 
-            for i = 1:length(entries)
-                entry = strtrim(entries{i});
-                tokens = regexp(entry, '<([^>]+)>;\s*rel="([^"]+)"', 'tokens');
-                if ~isempty(tokens)
-                    url = tokens{1}{1};
-                    rel = tokens{1}{2};
-                    links.(rel) = url;
-                end
-            end
+function links = parseLinkHeader(linkStr)
+% Parses a Canvas-style Link header
+% Returns a struct with rel names as fields: e.g., links.next, links.last
+links = struct;
+entries = strsplit(linkStr, ',');
+
+for i = 1:length(entries)
+    entry = strtrim(entries{i});
+    tokens = regexp(entry, '<([^>]+)>;\s*rel="([^"]+)"', 'tokens');
+    if ~isempty(tokens)
+        url = tokens{1}{1};
+        rel = tokens{1}{2};
+        links.(rel) = url;
+    end
+end
+end
+
+function S = normalizeStruct(cellStructs)
+% Converts a 1xN cell array of structs with unequal fields
+% into a struct array with all fields present in each element.
+
+% All unique field names
+allFields = [];
+for s = cellStructs'
+    theseFields = string(fieldnames(s{1}));
+    allFields = unique([theseFields; allFields]);
+end
+
+% Initialize output
+N = numel(cellStructs);
+S = repmat(struct(), N, 1);
+
+for i = 1:N
+    thisStruct = cellStructs{i};
+    for f = allFields'
+        fname = f{1};
+        if isfield(thisStruct, fname)
+            S(i).(fname) = thisStruct.(fname);
+        else
+            S(i).(fname) = [];
         end
-        function S = normalizeStruct(cellStructs)
-            % Converts a 1xN cell array of structs with unequal fields
-            % into a struct array with all fields present in each element.
+    end
+end
+end
 
-            % All unique field names
-            allFields = [];
-            for s = cellStructs'
-                theseFields = string(fieldnames(s{1}));
-                allFields = unique([theseFields; allFields]);
-            end
+function merged = unionStructs(A, B)
+% Merges two struct arrays A and B, handling missing fields.
+% Ensures all structs have the same fields before concatenation.
 
-            % Initialize output
-            N = numel(cellStructs);
-            S = repmat(struct(), N, 1);
+if isempty(A); merged = B; return; end
+if isempty(B); merged = A; return; end
 
-            for i = 1:N
-                thisStruct = cellStructs{i};
-                for f = allFields'
-                    fname = f{1};
-                    if isfield(thisStruct, fname)
-                        S(i).(fname) = thisStruct.(fname);
-                    else
-                        S(i).(fname) = [];
-                    end
-                end
-            end
-        end
-        function merged = unionStructs(A, B)
-            % Merges two struct arrays A and B, handling missing fields.
-            % Ensures all structs have the same fields before concatenation.
+% Get all fieldnames
+fieldsA = fieldnames(A);
+fieldsB = fieldnames(B);
+allFields = unique([fieldsA; fieldsB]);
 
-            if isempty(A); merged = B; return; end
-            if isempty(B); merged = A; return; end
-
-            % Get all fieldnames
-            fieldsA = fieldnames(A);
-            fieldsB = fieldnames(B);
-            allFields = unique([fieldsA; fieldsB]);
-
-            % Pad missing fields in A
-            for i = 1:numel(A)
-                for f = allFields'
-                    fname = f{1};
-                    if ~isfield(A(i), fname)
-                        A(i).(fname) = [];
-                    end
-                end
-            end
-
-            % Pad missing fields in B
-            for i = 1:numel(B)
-                for f = allFields'
-                    fname = f{1};
-                    if ~isfield(B(i), fname)
-                        B(i).(fname) = [];
-                    end
-                end
-            end
-
-            % Concatenate
-            merged = [A; B];
+% Pad missing fields in A
+for i = 1:numel(A)
+    for f = allFields'
+        fname = f{1};
+        if ~isfield(A(i), fname)
+            A(i).(fname) = [];
         end
     end
 end
 
+% Pad missing fields in B
+for i = 1:numel(B)
+    for f = allFields'
+        fname = f{1};
+        if ~isfield(B(i), fname)
+            B(i).(fname) = [];
+        end
+    end
+end
+
+% Concatenate
+merged = [A; B];
+end
+
+function data = Chars2StringsRec(data)
+if isstruct(data)
+    % If it's a structure, recurse through each field
+    fields = fieldnames(data);
+    for i = 1:numel(fields)
+        for j = 1:numel(data)
+            fieldValue = data(j).(fields{i});
+            data(j).(fields{i}) = Chars2StringsRec(fieldValue);
+        end
+    end
+elseif iscell(data)
+    % Recurse through each cell
+    for i = 1:numel(data)
+        data{i} = Chars2StringsRec(data{i});
+    end
+elseif ischar(data)
+    % Convert char array to string
+    data = string(data);
+end
+% Leave other data types (numeric, logical, etc.) untouched
+end
