@@ -130,6 +130,8 @@ classdef Canvas
                 students(n).section = extractAfter(enroleCode, '-');
             end
 
+            students = Chars2StringsRec(students);
+
         end
         function asmts = getAssignments(obj)
             %GETASSIGNMENTS Retrieve all assignments in the current Canvas course
@@ -140,6 +142,8 @@ classdef Canvas
             url = buildURL(obj, endpoint);
 
             asmts = getPayload(obj, url);
+
+            asmts = Chars2StringsRec(asmts);
         end
     end
 
