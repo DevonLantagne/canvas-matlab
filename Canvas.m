@@ -2,8 +2,11 @@ classdef Canvas
     %CANVAS Summary of this class goes here
     %   Detailed explanation goes here
 
+    properties
+        debug (1,1) logical = false
+    end
+
     properties (Access = private)
-        token (1,1) string
         baseURL (1,1) string
         courseID (1,1) string
     end
@@ -13,13 +16,14 @@ classdef Canvas
     end
 
     properties (Access = private, Hidden)
+        token (1,1) string
         headers
     end
 
 
     %% Constructor
     methods
-        function obj = Canvas(baseURL, token, courseID)
+        function obj = Canvas(baseURL, token, courseID, opts)
             %CANVAS Construct an instance of this class
             %   Detailed explanation goes here
 
@@ -27,11 +31,14 @@ classdef Canvas
                 baseURL (1,1) string
                 token (1,1) string
                 courseID (1,1) string
+                opts.debug (1,1) logical = false
             end
 
             obj.token = token;
             obj.baseURL = baseURL;
             obj.courseID = courseID;
+
+            obj.debug = opts.debug;
 
             obj.headers = [
                 matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
@@ -71,9 +78,9 @@ classdef Canvas
             end
 
             endpoint = "search_users";
-
             url = obj.buildURL(endpoint);
 
+            % Attach arguments
             qs = [...
                 matlab.net.QueryParameter('enrollment_type[]', 'student'), ...
                 matlab.net.QueryParameter('enrollment_state[]', 'active'), ...
@@ -133,6 +140,11 @@ classdef Canvas
 
     %% Private
     methods (Access = private)
+        function printdb(obj, message)
+            if obj.debug
+                fprintf("%s\n", message)
+            end
+        end
         function url = buildURL(obj, endpoint)
             if (nargin==1) || isempty(endpoint)
                 % if no endpoint, just use course URI
@@ -158,7 +170,9 @@ classdef Canvas
                     error('Failed to fetch data: %s', char(resp.StatusLine.ReasonPhrase));
                 end
 
-                %fprintf("Queries remaining: %d\n", double(resp.getFields("x-rate-limit-remaining").Value))
+                obj.printdb(sprintf("API Limiting:\n\tCost: %f\n\tRemaining: %f",...
+                    double(resp.getFields("x-request-cost").Value), ...
+                    double(resp.getFields("x-rate-limit-remaining").Value)))
 
                 if isstruct(resp.Body.Data)
                     data = unionStructs(data, resp.Body.Data);
