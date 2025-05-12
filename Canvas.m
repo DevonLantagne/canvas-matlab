@@ -9,7 +9,7 @@ classdef Canvas
     end
 
     properties (Dependent)
-        courseURL
+        
     end
 
     properties (Access = private, Hidden)
@@ -23,24 +23,26 @@ classdef Canvas
             %CANVAS Construct an instance of this class
             %   Detailed explanation goes here
 
-            
+            arguments
+                baseURL (1,1) string
+                token (1,1) string
+                courseID (1,1) string
+            end
 
-            obj.token = string(token);
-            obj.baseURL = string(baseURL);
-            obj.courseID = string(courseID);
+            obj.token = token;
+            obj.baseURL = baseURL;
+            obj.courseID = courseID;
 
             obj.headers = [
                 matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
                 matlab.net.http.HeaderField('Accept', 'application/json')
                 ];
 
-
-            uri = matlab.net.URI(sprintf('%s/courses/%s', ...
-                obj.baseURL, obj.courseID));
+            url = buildURL(obj); % Build default course URL
 
             request = matlab.net.http.RequestMessage('GET', obj.headers);
             try
-                response = request.send(uri);
+                response = request.send(url);
                 if response.StatusCode ~= matlab.net.http.StatusCode.OK
                     error("CanvasAPI:ConnectionFailed", ...
                         "Connection failed: %s", response.StatusLine);
@@ -53,10 +55,9 @@ classdef Canvas
         end
     end
 
+    %% GET Methods
     methods
-        function out = get.courseURL(obj)
-            out = sprintf("%s/courses/%s", obj.baseURL, obj.courseID);
-        end
+        
     end
 
     %% HTTP GET Methods
@@ -69,7 +70,9 @@ classdef Canvas
                 opts.GetAvatar (1,1) logical = false
             end
 
-            uri = matlab.net.URI(sprintf('%s/search_users', obj.courseURL));
+            endpoint = "search_users";
+
+            url = obj.buildURL(endpoint);
 
             qs = [...
                 matlab.net.QueryParameter('enrollment_type[]', 'student'), ...
@@ -80,9 +83,9 @@ classdef Canvas
             if opts.GetAvatar
                 qs = [qs, matlab.net.QueryParameter('include[]', 'avatar_url')];
             end
-            uri.Query = qs;
+            url.Query = qs;
 
-            students = getPayload(obj, uri);
+            students = getPayload(obj, url);
 
             % Modify data output by relocating enrollment section
             for n = 1:length(students)
@@ -93,10 +96,10 @@ classdef Canvas
         end
         function asmts = getAssignments(obj)
 
-            uri = matlab.net.URI(sprintf('%s/courses/%s/assignments', ...
-                obj.baseURL, obj.courseID));
+            endpoint = "assignments";
+            url = buildURL(obj, endpoint);
 
-            asmts = getPayload(obj, uri);
+            asmts = getPayload(obj, url);
         end
     end
 
@@ -130,9 +133,18 @@ classdef Canvas
 
     %% Private
     methods (Access = private)
-        function data = getPayload(obj, uri)
-            import matlab.net.*
-            import matlab.net.http.*
+        function url = buildURL(obj, endpoint)
+            if (nargin==1) || isempty(endpoint)
+                % if no endpoint, just use course URI
+                endpoint = "";
+            else
+                % For all other endpoints
+                endpoint = "/" + string(endpoint); % ensure a string
+            end
+            url = matlab.net.URI(sprintf(...
+                '%s/courses/%s%s', obj.baseURL, obj.courseID, endpoint));
+        end
+        function data = getPayload(obj, url)
 
             data = [];
 
@@ -140,7 +152,7 @@ classdef Canvas
 
             while true
 
-                resp = req.send(uri);
+                resp = req.send(url);
 
                 if resp.StatusCode ~= matlab.net.http.StatusCode.OK
                     error('Failed to fetch data: %s', char(resp.StatusLine.ReasonPhrase));
@@ -170,7 +182,7 @@ classdef Canvas
                     break;
                 end
 
-                uri = matlab.net.URI(links.next);
+                url = matlab.net.URI(links.next);
 
             end
         end
