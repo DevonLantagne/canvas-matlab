@@ -22,29 +22,26 @@ classdef Canvas
         function obj = Canvas(baseURL, token, courseID)
             %CANVAS Construct an instance of this class
             %   Detailed explanation goes here
-            import matlab.net.*
-            import matlab.net.http.*
+
+            
 
             obj.token = string(token);
             obj.baseURL = string(baseURL);
             obj.courseID = string(courseID);
 
             obj.headers = [
-                HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
-                HeaderField('Accept', 'application/json')
+                matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
+                matlab.net.http.HeaderField('Accept', 'application/json')
                 ];
 
-            % Test connection
-            import matlab.net.*
-            import matlab.net.http.*
 
-            uri = URI(sprintf('%s/courses/%s', ...
+            uri = matlab.net.URI(sprintf('%s/courses/%s', ...
                 obj.baseURL, obj.courseID));
 
-            request = RequestMessage('GET', obj.headers);
+            request = matlab.net.http.RequestMessage('GET', obj.headers);
             try
                 response = request.send(uri);
-                if response.StatusCode ~= StatusCode.OK
+                if response.StatusCode ~= matlab.net.http.StatusCode.OK
                     error("CanvasAPI:ConnectionFailed", ...
                         "Connection failed: %s", response.StatusLine);
                 end
@@ -71,20 +68,17 @@ classdef Canvas
                 obj (1,1) Canvas
                 opts.GetAvatar (1,1) logical = false
             end
-            import matlab.net.*
-            import matlab.net.http.*
 
-            uri = URI(sprintf('%s/search_users', ...
-                obj.courseURL));
+            uri = matlab.net.URI(sprintf('%s/search_users', obj.courseURL));
 
             qs = [...
-                QueryParameter('enrollment_type[]', 'student'), ...
-                QueryParameter('enrollment_state[]', 'active'), ...
-                QueryParameter('per_page', '100'), ...
-                QueryParameter('include[]', 'enrollments') ...
+                matlab.net.QueryParameter('enrollment_type[]', 'student'), ...
+                matlab.net.QueryParameter('enrollment_state[]', 'active'), ...
+                matlab.net.QueryParameter('per_page', '100'), ...
+                matlab.net.QueryParameter('include[]', 'enrollments') ...
                 ];
             if opts.GetAvatar
-                qs = [qs, QueryParameter('include[]', 'avatar_url')];
+                qs = [qs, matlab.net.QueryParameter('include[]', 'avatar_url')];
             end
             uri.Query = qs;
 
@@ -99,10 +93,7 @@ classdef Canvas
         end
         function asmts = getAssignments(obj)
 
-            import matlab.net.*
-            import matlab.net.http.*
-
-            uri = URI(sprintf('%s/courses/%s/assignments', ...
+            uri = matlab.net.URI(sprintf('%s/courses/%s/assignments', ...
                 obj.baseURL, obj.courseID));
 
             asmts = getPayload(obj, uri);
@@ -145,15 +136,13 @@ classdef Canvas
 
             data = [];
 
-            req = RequestMessage('GET', obj.headers);
-
-            %queries = uri.Query;
+            req = matlab.net.http.RequestMessage('GET', obj.headers);
 
             while true
 
                 resp = req.send(uri);
 
-                if resp.StatusCode ~= StatusCode.OK
+                if resp.StatusCode ~= matlab.net.http.StatusCode.OK
                     error('Failed to fetch data: %s', char(resp.StatusLine.ReasonPhrase));
                 end
 
@@ -181,8 +170,8 @@ classdef Canvas
                     break;
                 end
 
-                uri = URI(links.next);
-                %uri.Query = queries;
+                uri = matlab.net.URI(links.next);
+
             end
         end
     end
@@ -192,6 +181,7 @@ end
 %% Helper Functions
 % These functions are encapsulated inside this .m file and cannot be
 % accessed outside the class.
+
 
 function links = parseLinkHeader(linkStr)
 % Parses a Canvas-style Link header
