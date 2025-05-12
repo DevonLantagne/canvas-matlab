@@ -1,13 +1,30 @@
 classdef Canvas
-    %CANVAS Summary of this class goes here
-    %   Detailed explanation goes here
+    %CANVAS Interface to the Canvas LMS REST API
+    %   This class allows you to interact with the Canvas Learning Management System
+    %   using the public REST API. You can retrieve data such as students, assignments,
+    %   and post grades using authenticated HTTP requests.
+    %
+    %   obj = Canvas(baseURL, token, courseID) creates a new Canvas API object.
+    %
+    %   INPUTS:
+    %       baseURL  - Base URL of the Canvas instance (e.g., "https://canvas.instructure.com/api/v1")
+    %       token    - Canvas API access token (string)
+    %       courseID - Canvas course ID (string)
+    %
+    %   OPTIONAL NAME-VALUE ARGUMENTS:
+    %       debug    - Logical flag to enable verbose debug printing
 
     properties
+        %DEBUG Enable verbose debug printing
+        %   If true, API requests and rate limit details are printed to the console.
         debug (1,1) logical = false
     end
 
     properties (Access = private)
+        %BASEURL The base URL for the Canvas API
         baseURL (1,1) string
+
+        %COURSEID The Canvas course identifier
         courseID (1,1) string
     end
 
@@ -16,7 +33,10 @@ classdef Canvas
     end
 
     properties (Access = private, Hidden)
+        %TOKEN Bearer token used for authentication
         token (1,1) string
+
+        %HEADERS Precomputed HTTP headers used in each request
         headers
     end
 
@@ -24,8 +44,12 @@ classdef Canvas
     %% Constructor
     methods
         function obj = Canvas(baseURL, token, courseID, opts)
-            %CANVAS Construct an instance of this class
-            %   Detailed explanation goes here
+            %CANVAS Construct a Canvas API interface object
+            %   obj = Canvas(baseURL, token, courseID) initializes a connection to
+            %   a Canvas course using the provided API token.
+            %
+            %   Optional:
+            %       opts.debug - enable verbose printing of requests (default: false)
 
             arguments
                 baseURL (1,1) string
@@ -72,6 +96,12 @@ classdef Canvas
     % Canvas.
     methods
         function students = getStudents(obj, opts)
+            %GETSTUDENTS Retrieve all active students enrolled in the course
+            %   students = getStudents(obj) fetches enrolled students in the current course.
+            %
+            %   Optional name-value pairs:
+            %       GetAvatar - if true, includes avatar URLs in the response
+
             arguments
                 obj (1,1) Canvas
                 opts.GetAvatar (1,1) logical = false
@@ -102,6 +132,9 @@ classdef Canvas
 
         end
         function asmts = getAssignments(obj)
+            %GETASSIGNMENTS Retrieve all assignments in the current Canvas course
+            %   asmts = getAssignments(obj) returns a struct array of assignments
+            %   available in the configured course.
 
             endpoint = "assignments";
             url = buildURL(obj, endpoint);
@@ -146,6 +179,9 @@ classdef Canvas
             end
         end
         function url = buildURL(obj, endpoint)
+            %BUILDURL Construct a full API URI from the endpoint
+            %   url = buildURL(obj, endpoint) returns the full URL to use for a GET/POST
+
             if (nargin==1) || isempty(endpoint)
                 % if no endpoint, just use course URI
                 endpoint = "";
@@ -157,6 +193,7 @@ classdef Canvas
                 '%s/courses/%s%s', obj.baseURL, obj.courseID, endpoint));
         end
         function data = getPayload(obj, url)
+            %GETPAYLOAD Performs a GET request and returns the data from the response.
 
             data = [];
 
@@ -291,6 +328,7 @@ merged = [A; B];
 end
 
 function data = Chars2StringsRec(data)
+% Recursive search through structure to change char arrays to strings.
 if isstruct(data)
     % If it's a structure, recurse through each field
     fields = fieldnames(data);
