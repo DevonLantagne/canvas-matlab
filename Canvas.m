@@ -133,6 +133,38 @@ classdef Canvas
             students = Chars2StringsRec(students);
 
         end
+        function asmt_grps = getAssignmentGroups(obj)
+            %getAssignmentGroups Retrieve all assignments groups in the current Canvas course
+            %   asmt_grps = getAssignmentGroups(obj) returns a struct array
+            %   of assignment groups available in the configured course.
+            %   Also returns the assignments within those groups.
+
+            endpoint = "assignment_groups";
+            url = buildURL(obj, endpoint);
+
+            % Attach arguments
+            qs = [...
+                matlab.net.QueryParameter('per_page', '100'), ...
+                matlab.net.QueryParameter('include[]', 'assignments') ...
+                ];
+            url.Query = qs;
+
+            asmt_grps = getPayload(obj, url);
+
+            % Force "assignments" to be structs
+            for n = 1:length(asmt_grps)
+                asmt_grps(n).assignments = normalizeStruct(asmt_grps(n).assignments);
+            end
+
+            asmt_grps = Chars2StringsRec(asmt_grps);
+
+            % Add field for percentage of final grade
+            totalWeight = sum([asmt_grps.group_weight]);
+            for n = 1:length(asmt_grps)
+                asmt_grps(n).group_weight_perc = ...
+                    asmt_grps(n).group_weight ./ totalWeight;
+            end
+        end
         function asmts = getAssignments(obj)
             %GETASSIGNMENTS Retrieve all assignments in the current Canvas course
             %   asmts = getAssignments(obj) returns a struct array of assignments
@@ -268,12 +300,19 @@ end
 end
 
 function S = normalizeStruct(cellStructs)
-% Converts a 1xN cell array of structs with unequal fields
+% Converts a 1xN or Nx1 cell array of structs with unequal fields
 % into a struct array with all fields present in each element.
+
+if isstruct(cellStructs)
+    S = cellStructs;
+    return
+end
+
+cellStructs = vertcat(cellStructs(:));
 
 % All unique field names
 allFields = [];
-for s = cellStructs'
+for s = cellStructs
     theseFields = string(fieldnames(s{1}));
     allFields = unique([theseFields; allFields]);
 end

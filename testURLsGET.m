@@ -32,3 +32,17 @@ for i = 1:length(students)
         students(i).sis_user_id,...
         students(i).section);
 end
+
+%% Get Assignment Groups
+
+fprintf("\nGetting Assignment Groups...\n\n")
+
+asmt_grps = canv.getAssignmentGroups();
+
+% Display some basic info
+for i = 1:length(asmt_grps)
+    fprintf('Group: [%d] %s, Weight: %f\n', ...
+        asmt_grps(i).id,...
+        asmt_grps(i).name, ...
+        asmt_grps(i).group_weight);
+end
