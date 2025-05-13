@@ -1,6 +1,8 @@
 # Canvas Class for MATLAB
 
-This MATLAB class provides a lightweight interface for interacting with the [Canvas LMS REST API](https://canvas.instructure.com/doc/api/) from within MATLAB. It supports secure access using API tokens and provides methods to retrieve course-related data such as students, assignments, and submissions.
+This MATLAB class provides a lightweight interface for interacting with the [Canvas LMS REST API](https://canvas.instructure.com/doc/api/) from within MATLAB. It supports secure access using API tokens and provides methods to retrieve course-related data such as students, assignments, and submissions.\
+\
+This project is currently under heavy development!
 
 ## Features
 
