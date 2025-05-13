@@ -189,9 +189,24 @@ classdef Canvas
 
             asmt = Chars2StringsRec(asmt);
         end
+        function subs = getSubmissions(obj, assignmentID)
+            %getSubmissions Retrieve all submission metadata for specific assignment
+            %   subs = getSubmissions(obj, asmtID) returns a struct array of
+            %   all submissions
+            arguments
+                obj (1,1) Canvas
+                assignmentID (1,1) double
+            end
+            endpoint = "assignments/" + assignmentID + "/submissions";
+            url = buildURL(obj, endpoint);
+
+            subs = getPayload(obj, url);
+            subs = Chars2StringsRec(subs);
+        end
         
         % Downloads
-        function downloadSubmissions(ThisAsmtID, downloadsPath)
+        function downloadSubmissions(assignmentID, downloadsPath)
+            % Get assignment object
 
         end
     end

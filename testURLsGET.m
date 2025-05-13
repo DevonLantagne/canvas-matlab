@@ -51,7 +51,8 @@ end
 ThisAsmtID = asmts(1).id;
 fprintf("\nGetting Specific Assignment [%d]...\n\n", ThisAsmtID)
 ThisAsmt = canv.getAssignment(ThisAsmtID);
+subs = canv.getSubmissions(ThisAsmtID);
 % Download Submissions (windows user downloads folder)
 downloadsPath = fullfile(getenv('USERPROFILE'), 'Downloads');
-canv.downloadSubmissions(ThisAsmtID, downloadsPath);
+%canv.downloadSubmissions(ThisAsmtID, downloadsPath);
 
