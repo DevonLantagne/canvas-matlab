@@ -17,7 +17,7 @@ classdef Canvas
     properties
         %COURSENAME Name of the course from Canvas
         courseName
-        
+
         %COURSECODE Canvas course code of the course
         courseCode
 
@@ -242,11 +242,12 @@ classdef Canvas
             % Make directory if it does not exist
             if ~isfolder(downloadsPath); mkdir(downloadsPath);end
             
-            % First get the submissions for the assignment
+            % Get the submissions for the assignment
             subs = obj.getSubmissions(assignmentID);
 
-            % Also get list of all students
+            % Get list of all students
             students = obj.getStudents();
+            
             % Filter students by section if not empty
             if ~isempty(opts.Sections)
                 KeepItem = matches(vertcat(students.section), opts.Sections);
@@ -340,6 +341,7 @@ classdef Canvas
                 end
             end
         end
+        
     end
     
 
@@ -409,6 +411,7 @@ classdef Canvas
                 url.Query = queryList;
             end
         end
+        
         function data = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
 
