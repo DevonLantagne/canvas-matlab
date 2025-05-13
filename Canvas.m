@@ -18,6 +18,10 @@ classdef Canvas
         %DEBUG Enable verbose debug printing
         %   If true, API requests and rate limit details are printed to the console.
         debug (1,1) logical = false
+        
+        %PERPAGE Sets the number of items per API call before paging
+        %   Must be a value between 10 and 100 (default is 100).
+        PerPage (1,1) uint8 {mustBeNumeric, mustBeInRange(PerPage,10,100)} = 100
     end
 
     properties (Access = private)
@@ -88,7 +92,9 @@ classdef Canvas
 
     %% GET Methods
     methods
-        
+        function out = get.PerPage(obj)
+            out = num2str(obj.PerPage);
+        end
     end
 
     %% HTTP GET Methods
@@ -108,19 +114,14 @@ classdef Canvas
             end
 
             endpoint = "search_users";
-            url = obj.buildURL(endpoint);
-
-            % Attach arguments
-            qs = [...
-                matlab.net.QueryParameter('enrollment_type[]', 'student'), ...
-                matlab.net.QueryParameter('enrollment_state[]', 'active'), ...
-                matlab.net.QueryParameter('per_page', '100'), ...
-                matlab.net.QueryParameter('include[]', 'enrollments') ...
-                ];
+            url = obj.buildURL(endpoint,...
+                {'enrollment_type[]',   'student'},...
+                {'enrollment_state[]',  'active'},...
+                {'per_page',            obj.PerPage},...
+                {'include[]',           'enrollments'});
             if opts.GetAvatar
-                qs = [qs, matlab.net.QueryParameter('include[]', 'avatar_url')];
+                url = obj.addQuery(url, {'include[]', 'avatar_url'});
             end
-            url.Query = qs;
 
             students = getPayload(obj, url);
 
@@ -140,14 +141,9 @@ classdef Canvas
             %   Also returns the assignments within those groups.
 
             endpoint = "assignment_groups";
-            url = buildURL(obj, endpoint);
-
-            % Attach arguments
-            qs = [...
-                matlab.net.QueryParameter('per_page', '100'), ...
-                matlab.net.QueryParameter('include[]', 'assignments') ...
-                ];
-            url.Query = qs;
+            url = buildURL(obj, endpoint, ...
+                {'per_page', obj.PerPage}, ...
+                {'include[]', 'assignments'});
 
             asmt_grps = getPayload(obj, url);
 
@@ -171,11 +167,20 @@ classdef Canvas
             %   available in the configured course.
 
             endpoint = "assignments";
-            url = buildURL(obj, endpoint);
+            url = buildURL(obj, endpoint, {'per_page', obj.PerPage});
 
             asmts = getPayload(obj, url);
 
             asmts = Chars2StringsRec(asmts);
+        end
+        function submissions = getSubmissions(obj)
+            error("Not Implemented")
+            endpoint = "students/submissions";
+            url = buildURL(obj, endpoint);
+
+            submissions = getPayload(obj, url);
+
+            submissions = Chars2StringsRec(submissions);
         end
     end
 
@@ -211,12 +216,14 @@ classdef Canvas
     methods (Access = private)
         function printdb(obj, message)
             if obj.debug
-                fprintf("%s\n", message)
+                fprintf("[DEBUG] %s\n", message)
             end
         end
-        function url = buildURL(obj, endpoint)
-            %BUILDURL Construct a full API URI from the endpoint
+        function url = buildURL(obj, endpoint, varargin)
+            %BUILDURL Construct a full API URI from the endpoint and arguments
             %   url = buildURL(obj, endpoint) returns the full URL to use for a GET/POST
+            %   Arguments are passed as 1x2 cell arrays {argName, value}
+            %   url = buildURL(obj, endpoint, {arg1,val1}, {arg2,val2})
 
             if (nargin==1) || isempty(endpoint)
                 % if no endpoint, just use course URI
@@ -227,11 +234,28 @@ classdef Canvas
             end
             url = matlab.net.URI(sprintf(...
                 '%s/courses/%s%s', obj.baseURL, obj.courseID, endpoint));
+
+            % Add arguments to URL
+            url = obj.addQuery(url, varargin{:});
+        end
+        function url = addQuery(obj, url, varargin)
+            % Add arguments to URL
+            if ~isempty(varargin)
+                queryList = url.Query;
+                for arg = 1:length(varargin)
+                    queryList = [queryList, ...
+                        matlab.net.QueryParameter(...
+                        varargin{arg}{1}, varargin{arg}{2})];
+                end
+                url.Query = queryList;
+            end
         end
         function data = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
 
             data = [];
+
+            obj.printdb(sprintf("GET: %s", url.EncodedURI))
 
             req = matlab.net.http.RequestMessage('GET', obj.headers);
 
@@ -243,7 +267,7 @@ classdef Canvas
                     error('Failed to fetch data: %s', char(resp.StatusLine.ReasonPhrase));
                 end
 
-                obj.printdb(sprintf("API Limiting:\n\tCost: %f\n\tRemaining: %f",...
+                obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
                     double(resp.getFields("x-request-cost").Value), ...
                     double(resp.getFields("x-rate-limit-remaining").Value)))
 
