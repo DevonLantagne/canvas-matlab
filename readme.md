@@ -75,7 +75,7 @@ StudentList = api.getStudents();
 ```
 
 #### `getStudents(opts)`: 
-Get a list of students in the course.\
+Get a list of students in the course.
 ```matlab
 StudentList = api.getStudents();
 ```
@@ -112,15 +112,21 @@ asmt = api.getSubmissions(12345);
 
 #### `downloadSubmissions(assignmentID, downloadsPath)`:
 Download all submission attachments for an assignment. This includes comments of instructors and students as well as all submitted content.\
-Files that already exist will not be modified except for `comments.txt`.\
-Use `getAssignments()` to get the list of assignment IDs.\
 `downloadsPath` is a path on your computer to place the downloaded content. If the path does not exist, it will be created.
+Within the `downloadsPath`, a new folder will be created for each student. All files of all submission attempts will be downloaded to the student's folder. Files will be prepended with "attemptX_" for the attempt number. The students folder will contain:
+- `empty.txt` if the student did not submit anything.
+- `attempt1 LATE (X hours).txt` if the student submitted late.
+- `comments.txt` for all instructor and student comments.
+- `attemptX_filename.ext` for all attached files.
+
+Files that already exist will not be modified except for `comments.txt`.\
+Use `getAssignments()` to get the list of assignment IDs.
 ```matlab
 api.downloadSubmissions(12345, "C:\MyFilePath\AssignmentFolder");
 ```
 You can also filter the downloads by section numbers:
 ```matlab
-api.downloadSubmissions(12345, "C:\MyFilePath\AssignmentFolder", Sections=["001", "002"]);
+api.downloadSubmissions(12345, "C:\MyFilePath\Assignment1", Sections=["001", "002"]);
 ```
 
 
