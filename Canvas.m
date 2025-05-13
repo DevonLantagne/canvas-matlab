@@ -26,7 +26,7 @@ classdef Canvas
         
         %PERPAGE Sets the number of items per API call before paging
         %   Must be a value between 10 and 100 (default is 100).
-        PerPage (1,1) uint8 {mustBeNumeric, mustBeInRange(PerPage,10,100)} = 100
+        perPage (1,1) uint8 {mustBeNumeric, mustBeInRange(perPage,10,100)} = 100
     end
 
     properties (Access = private)
@@ -106,8 +106,8 @@ classdef Canvas
 
     %% GET Methods
     methods
-        function out = get.PerPage(obj)
-            out = num2str(obj.PerPage);
+        function out = get.perPage(obj)
+            out = num2str(obj.perPage);
         end
     end
 
@@ -131,7 +131,7 @@ classdef Canvas
             url = obj.buildURL(endpoint,...
                 {'enrollment_type[]',   'student'},...
                 {'enrollment_state[]',  'active'},...
-                {'per_page',            obj.PerPage},...
+                {'per_page',            obj.perPage},...
                 {'include[]',           'enrollments'});
             if opts.GetAvatar
                 url = obj.addQuery(url, {'include[]', 'avatar_url'});
@@ -156,7 +156,7 @@ classdef Canvas
 
             endpoint = "assignment_groups";
             url = buildURL(obj, endpoint, ...
-                {'per_page',    obj.PerPage}, ...
+                {'per_page',    obj.perPage}, ...
                 {'include[]',   'assignments'});
 
             asmt_grps = getPayload(obj, url);
@@ -181,7 +181,7 @@ classdef Canvas
             %   available in the configured course.
 
             endpoint = "assignments";
-            url = buildURL(obj, endpoint, {'per_page', obj.PerPage});
+            url = buildURL(obj, endpoint, {'per_page', obj.perPage});
 
             asmts = getPayload(obj, url);
 
@@ -213,7 +213,7 @@ classdef Canvas
             end
             endpoint = "assignments/" + assignmentID + "/submissions";
             url = buildURL(obj, endpoint, ...
-                {'per_page', obj.PerPage},...
+                {'per_page', obj.perPage},...
                 {'include[]', 'submission_comments'},...
                 {'include[]', 'submission_history'});
 
