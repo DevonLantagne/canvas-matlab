@@ -47,4 +47,11 @@ for i = 1:length(asmts)
         asmts(i).name);
 end
 
+% Get a specific assignment
+ThisAsmtID = asmts(1).id;
+fprintf("\nGetting Specific Assignment [%d]...\n\n", ThisAsmtID)
+ThisAsmt = canv.getAssignment(ThisAsmtID);
+% Download Submissions (windows user downloads folder)
+downloadsPath = fullfile(getenv('USERPROFILE'), 'Downloads');
+canv.downloadSubmissions(ThisAsmtID, downloadsPath);
 
