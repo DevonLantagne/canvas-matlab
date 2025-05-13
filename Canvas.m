@@ -15,6 +15,11 @@ classdef Canvas
     %       debug    - Logical flag to enable verbose debug printing
 
     properties
+        %COURSENAME Name of the course from Canvas
+        courseName
+        %COURSECODE Canvas course code of the course
+        courseCode
+
         %DEBUG Enable verbose debug printing
         %   If true, API requests and rate limit details are printed to the console.
         debug (1,1) logical = false
@@ -76,8 +81,13 @@ classdef Canvas
             url = buildURL(obj); % Build default course URL
 
             request = matlab.net.http.RequestMessage('GET', obj.headers);
+            matlab.net.http.StatusCode.Unauthorized
             try
                 response = request.send(url);
+                if response.StatusCode == matlab.net.http.StatusCode.Unauthorized
+                    error("CanvasAPI:ConnectionFailedAuth", ...
+                        "Connection failed: %s\nCheck your API token and expiration.", response.StatusLine);
+                end
                 if response.StatusCode ~= matlab.net.http.StatusCode.OK
                     error("CanvasAPI:ConnectionFailed", ...
                         "Connection failed: %s", response.StatusLine);
@@ -86,6 +96,10 @@ classdef Canvas
                 error("CanvasAPI:ConnectionTestError", ...
                     "Could not connect to Canvas API: %s", ME.message);
             end
+            
+            % We have connection. Pull in some other info
+            obj.courseCode = string(response.Body.Data.course_code);
+            obj.courseName = string(response.Body.Data.name);
 
         end
     end

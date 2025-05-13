@@ -4,8 +4,7 @@ clc;clear;close all;
 
 env = read_env(".env");
 
-canv = Canvas(env.BASE_URL, env.API_KEY, env.COURSE_ID);
-canv.debug = true;
+canv = Canvas(env.BASE_URL, env.API_KEY, env.COURSE_ID, debug=true)
 
 fprintf("Canvas API connected!\n")
 
