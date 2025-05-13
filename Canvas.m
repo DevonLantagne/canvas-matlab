@@ -198,7 +198,10 @@ classdef Canvas
                 assignmentID (1,1) double
             end
             endpoint = "assignments/" + assignmentID + "/submissions";
-            url = buildURL(obj, endpoint);
+            url = buildURL(obj, endpoint, ...
+                {'per_page', obj.PerPage},...
+                {'include[]', 'submission_comments'},...
+                {'include[]', 'submission_history'});
 
             subs = getPayload(obj, url);
             subs = Chars2StringsRec(subs);
