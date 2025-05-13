@@ -17,6 +17,7 @@ classdef Canvas
     properties
         %COURSENAME Name of the course from Canvas
         courseName
+        
         %COURSECODE Canvas course code of the course
         courseCode
 
@@ -29,7 +30,7 @@ classdef Canvas
         perPage (1,1) uint8 {mustBeNumeric, mustBeInRange(perPage,10,100)} = 100
     end
 
-    properties (Access = private)
+    properties (SetAccess = private)
         %BASEURL The base URL for the Canvas API
         baseURL (1,1) string
 
