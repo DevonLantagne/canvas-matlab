@@ -9,17 +9,6 @@ canv.debug = true;
 
 fprintf("Canvas API connected!\n")
 
-%% Get Assignments
-fprintf("\nGetting Assignments...\n\n")
-asmts = canv.getAssignments;
-
-% Display some basic info
-for i = 1:length(asmts)
-    fprintf('[%d] %s\n', ...
-        asmts(i).id, ...
-        asmts(i).name);
-end
-
 %% Get Students
 fprintf("\nGetting Students...\n\n")
 
@@ -46,3 +35,16 @@ for i = 1:length(asmt_grps)
         asmt_grps(i).name, ...
         asmt_grps(i).group_weight);
 end
+
+%% Get Assignments
+fprintf("\nGetting Assignments...\n\n")
+asmts = canv.getAssignments();
+
+% Display some basic info
+for i = 1:length(asmts)
+    fprintf('[%d] %s\n', ...
+        asmts(i).id, ...
+        asmts(i).name);
+end
+
+

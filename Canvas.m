@@ -142,8 +142,8 @@ classdef Canvas
 
             endpoint = "assignment_groups";
             url = buildURL(obj, endpoint, ...
-                {'per_page', obj.PerPage}, ...
-                {'include[]', 'assignments'});
+                {'per_page',    obj.PerPage}, ...
+                {'include[]',   'assignments'});
 
             asmt_grps = getPayload(obj, url);
 
@@ -172,15 +172,6 @@ classdef Canvas
             asmts = getPayload(obj, url);
 
             asmts = Chars2StringsRec(asmts);
-        end
-        function submissions = getSubmissions(obj)
-            error("Not Implemented")
-            endpoint = "students/submissions";
-            url = buildURL(obj, endpoint);
-
-            submissions = getPayload(obj, url);
-
-            submissions = Chars2StringsRec(submissions);
         end
     end
 
