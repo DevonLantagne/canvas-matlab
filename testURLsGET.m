@@ -66,3 +66,6 @@ end
 if true
     courseFiles = canv.getFiles();
 end
+
+%% Get Modules
+modules = canv.getModules();

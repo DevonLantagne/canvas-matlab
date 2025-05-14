@@ -183,9 +183,7 @@ classdef Canvas
             asmt_grps = getPayload(obj, url);
 
             % Force "assignments" to be structs
-            for n = 1:length(asmt_grps)
-                asmt_grps(n).assignments = normalizeStruct(asmt_grps(n).assignments);
-            end
+            asmt_grps = forceStruct(asmt_grps, "assignments");
 
             asmt_grps = Chars2StringsRec(asmt_grps);
 
@@ -205,7 +203,6 @@ classdef Canvas
             url = buildURL(obj, endpoint, {'per_page', obj.perPage});
 
             asmts = getPayload(obj, url);
-
             asmts = Chars2StringsRec(asmts);
         end
         function asmt = getAssignment(obj, assignmentID)
@@ -221,7 +218,6 @@ classdef Canvas
             url = buildURL(obj, endpoint);
 
             asmt = getPayload(obj, url);
-
             asmt = Chars2StringsRec(asmt);
         end
         
@@ -326,6 +322,32 @@ classdef Canvas
 
             folder = getPayload(obj, url);
             folder = Chars2StringsRec(folder);
+        end
+
+        % Modules
+        function modules = getModules(obj, opts)
+            
+            arguments
+                obj (1,1) Canvas
+                opts.Search (1,1) string = ""
+            end
+
+            endpoint = "modules";
+            url = buildURL(obj, endpoint,...
+                {"include[]", "items",...
+                "include[]", "content_details",...
+                'per_page', obj.perPage});
+
+            % Check Search
+            if opts.Search ~= ""
+                url = appendQuery(url, {'search_term', opts.Search});
+            end
+
+            modules = getPayload(obj, url);
+
+            modules = forceStruct(modules, "items");
+
+            modules = Chars2StringsRec(modules);
         end
 
         % Downloads
@@ -726,6 +748,15 @@ for i = 1:length(entries)
         rel = tokens{1}{2};
         links.(rel) = url;
     end
+end
+end
+
+function S = forceStruct(S, fieldname)
+% Forces a field of heterogenous values to be structs. This is useful when
+% canvas returns a field that is sometimes a struct arrray but other times
+% it is a cell array.
+for n = 1:length(S)
+    S(n).(fieldname) = normalizeStruct(S(n).(fieldname));
 end
 end
 
