@@ -24,7 +24,7 @@ classdef Canvas
         %DEBUG Enable verbose debug printing
         %   If true, API requests and rate limit details are printed to the console.
         debug (1,1) logical = false
-        
+
         %PERPAGE Sets the number of items per API call before paging
         %   Must be a value between 10 and 100 (default is 100).
         perPage (1,1) uint8 {mustBeNumeric, mustBeInRange(perPage,10,100)} = 100
@@ -39,7 +39,7 @@ classdef Canvas
     end
 
     properties (Dependent)
-        
+
     end
 
     properties (Access = private, Hidden)
@@ -97,7 +97,7 @@ classdef Canvas
                 error("CanvasAPI:ConnectionTestError", ...
                     "Could not connect to Canvas API: %s", ME.message);
             end
-            
+
             % We have connection. Pull in some other info
             obj.courseCode = string(response.Body.Data.course_code);
             obj.courseName = string(response.Body.Data.name);
@@ -118,32 +118,50 @@ classdef Canvas
     methods
         function students = getStudents(obj, opts)
             %GETSTUDENTS Retrieve all active students enrolled in the course
-            %   students = getStudents(obj) fetches enrolled students in the current course.
+            %   students = getStudents(obj) fetches active enrolled students in the current course.
             %
             %   Optional name-value pairs:
             %       GetAvatar - if true, includes avatar URLs in the response
+            %       Query - if empty, does not send default query params.
+            %               User can supply a matlab.net.QueryParameter
+            %               object to send with the request.
 
             arguments
                 obj (1,1) Canvas
                 opts.GetAvatar (1,1) logical = false
+                opts.Query = 0;
             end
 
             endpoint = "search_users";
-            url = obj.buildURL(endpoint,...
-                {'enrollment_type[]',   'student'},...
-                {'enrollment_state[]',  'active'},...
-                {'per_page',            obj.perPage},...
-                {'include[]',           'enrollments'});
-            if opts.GetAvatar
-                url = obj.addQuery(url, {'include[]', 'avatar_url'});
+
+            url = obj.buildURL(endpoint);
+
+            % Apply user query or default
+            if opts.Query == 0
+                % Use defaults
+                url = obj.addQuery(url,...
+                    {'enrollment_type[]',   'student'},...
+                    {'enrollment_state[]',  'active'},...
+                    {'per_page',            obj.perPage},...
+                    {'include[]',           'enrollments'});
+
+                if opts.GetAvatar
+                    url = obj.addQuery(url, {'include[]', 'avatar_url'});
+                end
+            else
+                % Apply user's query params (can also be empty [])
+                url.Query = opts.Query;
             end
 
             students = getPayload(obj, url);
 
-            % Modify data output by relocating enrollment section
-            for n = 1:length(students)
-                enroleCode = students(n).enrollments.sis_section_id;
-                students(n).section = extractAfter(enroleCode, '-');
+            % Modify data output by relocating enrollment section (if it is
+            % in the response)
+            if isfield(students, "enrollments")
+                for n = 1:length(students)
+                    enroleCode = students(n).enrollments.sis_section_id;
+                    students(n).section = extractAfter(enroleCode, '-');
+                end
             end
 
             students = Chars2StringsRec(students);
@@ -221,7 +239,7 @@ classdef Canvas
             subs = getPayload(obj, url);
             subs = Chars2StringsRec(subs);
         end
-        
+
         % Downloads
         function downloadSubmissions(obj, assignmentID, downloadsPath, opts)
             %downloadSubmissions Downloads all student submissions for an assignment
@@ -241,7 +259,7 @@ classdef Canvas
 
             % Make directory if it does not exist
             if ~isfolder(downloadsPath); mkdir(downloadsPath);end
-            
+
             % Get the submissions for the assignment
             subs = obj.getSubmissions(assignmentID);
 
@@ -253,7 +271,7 @@ classdef Canvas
                 KeepItem = matches(vertcat(students.section), opts.Sections);
                 students(~KeepItem) = []; % remove
             end
-            
+
             % For each student, find all their submissions and download
             for st = 1:length(students)
                 % Get student metadata
@@ -341,9 +359,9 @@ classdef Canvas
                 end
             end
         end
-        
+
     end
-    
+
 
     %% HTTP POST Methods
     methods
@@ -411,7 +429,7 @@ classdef Canvas
                 url.Query = queryList;
             end
         end
-        
+
         function resp = putPayload(obj, url, bodyStruct)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
 
