@@ -428,6 +428,11 @@ classdef Canvas
 
         function resp = putPayload(obj, url, bodyStruct)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
+            arguments
+                obj (1,1) Canvas
+                url (1,1) matlab.net.URI
+                bodyStruct (:,1) struct
+            end
 
             % UNTESTED
             warning("putPayload is UNTESTED")
@@ -440,6 +445,10 @@ classdef Canvas
         end
         function data = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
+            arguments
+                obj (1,1) Canvas
+                url (1,1) matlab.net.URI
+            end
 
             data = [];
 
