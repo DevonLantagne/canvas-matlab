@@ -378,7 +378,7 @@ classdef Canvas
                 studentID (1,1) string
                 opts.Grade (1,1) string = []
                 opts.Comment (1,1) string = []
-                %opts.FileNames (:,1) string = []
+                opts.FileNames (:,1) string = []
             end
 
             endpoint = "assignments/" + assignmentID + "/submissions/" + studentID;
@@ -386,13 +386,25 @@ classdef Canvas
 
             % Form data structure
             bodyStruct = struct();
+
             % Append new grade
             if ~isempty(opts.Grade)
                 bodyStruct.submission = struct('posted_grade', opts.Grade);
             end
+
             % Append comment
             if ~isempty(opts.Comment)
                 bodyStruct.comment = struct('text_comment', opts.Comment);
+            end
+
+            % Append files
+            if ~isempty(opts.FileNames)
+                % TODO
+                fileEndpoint = "assignments/" + assignmentID + ...
+                    "/submissions/" + studentID + "/comments/files";
+                for fileName = opts.FileNames
+                    
+                end
             end
 
             % send PUT request
@@ -401,6 +413,9 @@ classdef Canvas
             success = [];
             msg = resp;
 
+        end
+        function fileID = testFileUpload(obj, endpoint, fileName)
+            fileID = obj.uploadFile(endpoint, fileName);
         end
         
     end
@@ -459,7 +474,81 @@ classdef Canvas
             %resp = req.send(url);
 
         end
-        
+        function fileID = uploadFile(obj, endpoint, fullFileName)
+            %UPLOADFILE Uploads a file to Canvas and returns the file's ID.
+
+            arguments
+                obj (1,1) Canvas
+                endpoint (1,1) string
+                fullFileName (1,1) string
+            end
+
+            % Get information about the file the user wants to upload
+            fileInfo = dir(fullFileName);
+            if isempty(fileInfo)
+                error("No such file or directory for\n%s", fullFileName)
+            end
+            fileName = fileInfo.name;
+            fileSize = fileInfo.bytes;
+
+            % Step 1: Instruct Canvas to make a file object
+            % This requires a POST request with multipart/form-data.
+            url = buildURL(obj, endpoint);
+
+            form = matlab.net.http.io.FormProvider('name', fileName, 'size', num2str(fileSize));
+
+            % Only send auth header.
+            authheader = matlab.net.http.HeaderField(...
+                'Authorization', ['Bearer ' char(obj.token)]);
+            
+            % Send the request
+            req = matlab.net.http.RequestMessage('post', authheader, form);
+            resp = req.send(url);
+
+            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
+                error("Failed to request file upload: %s", char(resp.StatusLine.ReasonPhrase))
+            end
+
+            % Parse the response
+            uploadData = resp.Body.Data;
+            uploadURL = uploadData.upload_url;
+            uploadParams = uploadData.upload_params;
+
+            % Step 2: Upload the File
+            % Start forming multipart forms
+            multipart = {};
+            
+            % Add the form fields from Canvas
+            fields = fieldnames(uploadParams);
+            for i = 1:numel(fields)
+                multipart = [multipart, fields(i), {uploadParams.(fields{i})}];
+            end
+            
+            % Add the actual file to the multipart
+            multipart = [multipart, {'file'}, {matlab.net.http.io.FileProvider(fullFileName)}];
+
+            uploadForm = matlab.net.http.io.MultipartFormProvider(multipart{:});
+            
+            % Send the request to the upload URL (no auth header needed)
+            uploadReq = matlab.net.http.RequestMessage('post', [], uploadForm);
+            uploadResp = uploadReq.send(uploadURL);
+
+            % Check if good upload:
+            % Get "location" from response
+            % if 3XX, perform a GET to the same location to complete the
+            % upload.
+            if uploadResp.StatusCode == matlab.net.http.StatusCode.Created
+                location = uploadResp.Body.Data.location;
+                testURL = matlab.net.URI(location);
+                testReq = matlab.net.http.RequestMessage('GET', obj.headers);
+                testresp = testReq.send(testURL);
+            else
+                error("A non 201 code was returned in the response. Incomplete implementation.")
+            end
+
+            fileID = testresp.Body.Data.id;
+
+        end
         function data = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
             arguments
