@@ -82,7 +82,7 @@ classdef Canvas
             url = buildURL(obj); % Build default course URL
 
             request = matlab.net.http.RequestMessage('GET', obj.headers);
-            matlab.net.http.StatusCode.Unauthorized
+
             try
                 response = request.send(url);
                 if response.StatusCode == matlab.net.http.StatusCode.Unauthorized
@@ -123,8 +123,8 @@ classdef Canvas
             %   Optional name-value pairs:
             %       GetAvatar - if true, includes avatar URLs in the response
             %       Query - if empty, does not send default query params.
-            %               User can supply a matlab.net.QueryParameter
-            %               object to send with the request.
+            %               User can supply a cell array of name,values:
+            %               st = canv.getStudents(Query={'arg1','val1','arg2','val2'})
 
             arguments
                 obj (1,1) Canvas
@@ -134,24 +134,23 @@ classdef Canvas
 
             endpoint = "search_users";
 
-            url = obj.buildURL(endpoint);
-
-            % Apply user query or default
+            % Determine query args
             if opts.Query == 0
                 % Use defaults
-                url = obj.addQuery(url,...
-                    {'enrollment_type[]',   'student'},...
-                    {'enrollment_state[]',  'active'},...
-                    {'per_page',            obj.perPage},...
-                    {'include[]',           'enrollments'});
-
+                qry = {'enrollment_type[]',   'student',...
+                    'enrollment_state[]',  'active',...
+                    'per_page',            obj.perPage,...
+                    'include[]',           'enrollments'};
+                % Append avatar links if needed
                 if opts.GetAvatar
-                    url = obj.addQuery(url, {'include[]', 'avatar_url'});
+                    qry = [qry, {'include[]', 'avatar_url'}];
                 end
             else
-                % Apply user's query params (can also be empty [])
-                url.Query = opts.Query;
+                % Use User's (can be empty for no queries)
+                qry = opts.Query;
             end
+
+            url = obj.buildURL(endpoint, qry);
 
             students = getPayload(obj, url);
 
@@ -175,8 +174,8 @@ classdef Canvas
 
             endpoint = "assignment_groups";
             url = buildURL(obj, endpoint, ...
-                {'per_page',    obj.perPage}, ...
-                {'include[]',   'assignments'});
+                {'per_page',    obj.perPage, ...
+                'include[]',   'assignments'});
 
             asmt_grps = getPayload(obj, url);
 
@@ -232,9 +231,9 @@ classdef Canvas
             end
             endpoint = "assignments/" + assignmentID + "/submissions";
             url = buildURL(obj, endpoint, ...
-                {'per_page', obj.perPage},...
-                {'include[]', 'submission_comments'},...
-                {'include[]', 'submission_history'});
+                {'per_page', obj.perPage,...
+                'include[]', 'submission_comments',...
+                'include[]', 'submission_history'});
 
             subs = getPayload(obj, url);
             subs = Chars2StringsRec(subs);
@@ -398,35 +397,32 @@ classdef Canvas
                 fprintf("[DEBUG] %s\n", message)
             end
         end
-        function url = buildURL(obj, endpoint, varargin)
-            %BUILDURL Construct a full API URI from the endpoint and arguments
-            %   url = buildURL(obj, endpoint) returns the full URL to use for a GET/POST
-            %   Arguments are passed as 1x2 cell arrays {argName, value}
-            %   url = buildURL(obj, endpoint, {arg1,val1}, {arg2,val2})
-
-            if (nargin==1) || isempty(endpoint)
-                % if no endpoint, just use course URI
-                endpoint = "";
-            else
-                % For all other endpoints
-                endpoint = "/" + string(endpoint); % ensure a string
+        function url = buildURL(obj, endpoint, queries)
+            %BUILDURL Construct a full API URL from the endpoint and arguments
+            %   url = buildURL(obj, endpoint) returns the full URL to use
+            %   for a GET request.
+            %   Queries (optional) must be a cell array of name,value pairs
+            %   of arguments and values for the request query.
+            %   url = buildURL(obj, endpoint, {arg1,val1,arg2,val2})
+            arguments
+                obj (1,1) Canvas
+                endpoint (1,1) string = ""
+                queries (1,:) cell = {}
             end
-            url = matlab.net.URI(sprintf(...
-                '%s/courses/%s%s', obj.baseURL, obj.courseID, endpoint));
 
-            % Add arguments to URL
-            url = obj.addQuery(url, varargin{:});
-        end
-        function url = addQuery(obj, url, varargin)
-            % Add arguments to URL
-            if ~isempty(varargin)
-                queryList = url.Query;
-                for arg = 1:length(varargin)
-                    queryList = [queryList, ...
-                        matlab.net.QueryParameter(...
-                        varargin{arg}{1}, varargin{arg}{2})];
-                end
-                url.Query = queryList;
+            if endpoint == ""
+                % if no endpoint, just use course URI
+            else
+                % For all other endpoints, prepend with /
+                endpoint = "/" + endpoint;
+            end
+
+            url = matlab.net.URI(sprintf('%s/courses/%s%s', ...
+                obj.baseURL, obj.courseID, endpoint));
+
+            % Add query arguments to URL
+            if ~isempty(queries)
+                url = appendQuery(url, queries);
             end
         end
 
@@ -500,6 +496,15 @@ end
 % These functions are encapsulated inside this .m file and cannot be
 % accessed outside the class.
 
+
+function url = appendQuery(url, queries)
+% Add arguments to URL
+% queries is a cell array of name,value query args
+if ~isempty(queries)
+    % append new queries to existing queries
+    url.Query = [url.Query, matlab.net.QueryParameter(queries{:})];
+end
+end
 
 function links = parseLinkHeader(linkStr)
 % Parses a Canvas-style Link header

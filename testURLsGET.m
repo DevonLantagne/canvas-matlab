@@ -51,12 +51,14 @@ for i = 1:length(asmts)
 end
 
 %% Get a specific assignment submissions
-ThisAsmtID = asmts(1).id;
-ThisAsmtID = 257963;
-fprintf("\nGetting Specific Assignment [%d]...\n\n", ThisAsmtID)
-ThisAsmt = canv.getAssignment(ThisAsmtID);
-subs = canv.getSubmissions(ThisAsmtID);
-% Download Submissions (windows user downloads folder)
-downloadsPath = fullfile(getenv('USERPROFILE'), 'Downloads', "CanvasTest");
-canv.downloadSubmissions(ThisAsmtID, downloadsPath, Sections=["002","003"]);
+if false
+    ThisAsmtID = asmts(1).id;
+    ThisAsmtID = 257963;
+    fprintf("\nGetting Specific Assignment [%d]...\n\n", ThisAsmtID)
+    ThisAsmt = canv.getAssignment(ThisAsmtID);
+    subs = canv.getSubmissions(ThisAsmtID);
+    % Download Submissions (windows user downloads folder)
+    downloadsPath = fullfile(getenv('USERPROFILE'), 'Downloads', "CanvasTest");
+    canv.downloadSubmissions(ThisAsmtID, downloadsPath, Sections=["002","003"]);
+end
 
