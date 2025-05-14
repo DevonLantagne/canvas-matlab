@@ -619,6 +619,36 @@ classdef Canvas
             fileID = testresp.Body.Data.id;
         end
         
+        % Modules
+        function [module, status] = createModule(obj, name, opts)
+            % 
+            % Default position is at the end.
+            % UnlockAt should be a datetime object in local time
+
+            arguments
+                obj (1,1) Canvas
+                name (1,1) string
+                opts.UnlockAt datetime = NaT
+                opts.Position uint16 {mustBeInteger,mustBeGreaterThan(opts.Position, 0)} = []
+            end
+
+            endpoint = "modules";
+            url = buildURL(obj, endpoint);
+
+            formArgs = {"module[name]", name};
+
+            if ~isempty(opts.Position)
+                formArgs = [formArgs, {"module[position]", opts.Position}];
+            end
+
+            if isnat(opts.UnlockAt)
+                formArgs = [formArgs, {"module[unlock_at]", local2UTCchar(opts.UnlockAt)}];
+            end
+
+            form = matlab.net.http.io.FormProvider(formArgs{:});
+
+            [module, status] = putPayload(obj, url, form);
+        end
         
     end
 
@@ -658,23 +688,32 @@ classdef Canvas
             end
         end
 
-        function resp = putPayload(obj, url, bodyStruct)
+        function [respData, status] = putPayload(obj, url, form)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
             arguments
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
-                bodyStruct (:,1) struct
+                form
             end
 
-            body_json = jsonencode(bodyStruct);
-            body = matlab.net.http.MessageBody(body_json);
-
-            req = matlab.net.http.RequestMessage('put', obj.headers, body);
+            postheaders = [
+                matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
+                matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
+                ];
             
-            resp = [];
+            req = matlab.net.http.RequestMessage('post', postheaders, form);
+            resp = req.send(url);
 
-            %resp = req.send(url);
+            if resp.StatusCode == matlab.net.http.StatusCode.OK
+                respData = resp.Body.Data;
+                if resp.Body.ContentType.Subtype == "json"
+                    respData = Chars2StringsRec(respData);
+                end
+            else
+                respData = [];
+            end
 
+            status = resp.StatusLine;
         end
         function data = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
@@ -738,6 +777,10 @@ end
 % These functions are encapsulated inside this .m file and cannot be
 % accessed outside the class.
 
+function timechar = local2UTCchar(localDT)
+localDT.TimeZone = 'UTC';
+timechar = char(opts.UnlockAt, 'yyyy-MM-dd''T''HH:mm:ss''Z''');
+end
 
 function url = appendQuery(url, queries)
 % Add arguments to URL
@@ -778,7 +821,7 @@ function S = normalizeStruct(cellStructs)
 % Converts a 1xN or Nx1 cell array of structs with unequal fields
 % into a struct array with all fields present in each element.
 
-if isstruct(cellStructs)
+if ~iscell(cellStructs)
     S = cellStructs;
     return
 end
