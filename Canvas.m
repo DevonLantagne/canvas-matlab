@@ -279,6 +279,49 @@ classdef Canvas
             files = getPayload(obj, url);
             files = Chars2StringsRec(files);
         end
+        function file = getFile(obj, fileID)
+            %GETFILE Retrieve metadata of a folder
+            arguments
+                obj (1,1) Canvas
+                fileID (1,1) string
+            end
+
+            endpoint = "files/" + fileID;
+            url = buildURL(obj, endpoint);
+
+            file = getPayload(obj, url);
+            file = Chars2StringsRec(file);
+        end
+        function folders = getFolders(obj)
+            %getFiles Retrieve metadata of all folders on canvas.
+            arguments
+                obj (1,1) Canvas
+            end
+
+            endpoint = "folders";
+            url = buildURL(obj, endpoint, ...
+                {'per_page', obj.perPage});
+
+            folders = getPayload(obj, url);
+            folders = Chars2StringsRec(folders);
+
+            % Sort folder tree
+            [~,index] = sortrows([folders.full_name].');
+            folders = folders(index);
+        end
+        function folder = getFolder(obj, folderID)
+            %GETFOLDER Retrieve metadata of a folder
+            arguments
+                obj (1,1) Canvas
+                folderID (1,1) string
+            end
+
+            endpoint = "folders/" + folderID;
+            url = buildURL(obj, endpoint);
+
+            folder = getPayload(obj, url);
+            folder = Chars2StringsRec(folder);
+        end
 
         % Downloads
         function downloadSubmissions(obj, assignmentID, downloadsPath, opts)
