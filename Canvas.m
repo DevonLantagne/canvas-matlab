@@ -362,32 +362,47 @@ classdef Canvas
     end
 
 
-    %% HTTP POST Methods
+    %% HTTP PUT Methods
     methods
-        function [success, msg] = sendGrade(obj, assignmentID, studentID, grade)
-            error("Don't")
-
-            studentID = num2str(studentID);
-
-            % Prepare URL and payload
-            url = sprintf('%s/courses/%s/assignments/%s/submissions/%s', ...
-                obj.baseURL, obj.courseID, assignmentID, studentID);
-
-            body = struct('submission', struct('posted_grade', num2str(grade)));
-
-            % Send HTTP PUT request to Canvas
-            try
-                response = webwrite(url, body, obj.webopts);
-
-                msg = sprintf('Updated grade for student %s, assignment %s\n', ...
-                    studentID, assignmentID);
-                success = true;
-            catch ME
-                msg = sprintf('Failed to update student %s, assignment %s: %s', ...
-                    studentID, assignmentID, ME.message);
-                success = false;
+        function [success, msg] = sendGrade(obj, assignmentID, studentID, opts)
+            %%SENDGRADE Sends instructor feedback and grade to a student's submission.
+            %   Can also send additional information with the grade posting
+            %   such as comments or files. 
+            %   Optional Arguments:
+            %   Grade - A grade to be given for the submission. Can be a
+            %   decimal number (for raw score), 
+            %   
+            arguments
+                obj (1,1) Canvas
+                assignmentID (1,1) string
+                studentID (1,1) string
+                opts.Grade (1,1) string = []
+                opts.Comment (1,1) string = []
+                %opts.FileNames (:,1) string = []
             end
+
+            endpoint = "assignments/" + assignmentID + "/submissions/" + studentID;
+            url = buildURL(obj, endpoint);
+
+            % Form data structure
+            bodyStruct = struct();
+            % Append new grade
+            if ~isempty(opts.Grade)
+                bodyStruct.submission = struct('posted_grade', opts.Grade);
+            end
+            % Append comment
+            if ~isempty(opts.Comment)
+                bodyStruct.comment = struct('text_comment', opts.Comment);
+            end
+
+            % send PUT request
+            resp = putPayload(obj, url, bodyStruct);
+
+            success = [];
+            msg = resp;
+
         end
+        
     end
 
     %% Private
@@ -434,15 +449,17 @@ classdef Canvas
                 bodyStruct (:,1) struct
             end
 
-            % UNTESTED
-            warning("putPayload is UNTESTED")
-
             body_json = jsonencode(bodyStruct);
             body = matlab.net.http.MessageBody(body_json);
-            req = matlab.net.http.RequestMessage('put', obj.headers, body);
 
-            resp = req.send(url);
+            req = matlab.net.http.RequestMessage('put', obj.headers, body);
+            
+            resp = [];
+
+            %resp = req.send(url);
+
         end
+        
         function data = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
             arguments
