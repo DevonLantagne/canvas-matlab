@@ -116,6 +116,7 @@ classdef Canvas
     % These methods only get data from Canvas and do not modify data on
     % Canvas.
     methods
+        % Student Info
         function students = getStudents(obj, opts)
             %GETSTUDENTS Retrieve all active students enrolled in the course
             %   students = getStudents(obj) fetches active enrolled students in the current course.
@@ -166,6 +167,8 @@ classdef Canvas
             students = Chars2StringsRec(students);
 
         end
+
+        % Assignments and Weighting
         function asmt_grps = getAssignmentGroups(obj)
             %getAssignmentGroups Retrieve all assignments groups in the current Canvas course
             %   asmt_grps = getAssignmentGroups(obj) returns a struct array
@@ -221,6 +224,8 @@ classdef Canvas
 
             asmt = Chars2StringsRec(asmt);
         end
+        
+        % Submissions
         function subs = getSubmissions(obj, assignmentID)
             %getSubmissions Retrieve all submission metadata for specific assignment
             %   subs = getSubmissions(obj, asmtID) returns a struct array of
