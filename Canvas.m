@@ -412,6 +412,18 @@ classdef Canvas
             end
         end
         
+        function resp = putPayload(obj, url, bodyStruct)
+            %PUTPAYLOAD Performs a PUT request and returns status of response.
+
+            % UNTESTED
+            warning("putPayload is UNTESTED")
+
+            body_json = jsonencode(bodyStruct);
+            body = matlab.net.http.MessageBody(body_json);
+            req = matlab.net.http.RequestMessage('put', obj.headers, body);
+
+            resp = req.send(url);
+        end
         function data = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
 
