@@ -362,7 +362,8 @@ classdef Canvas
     end
 
 
-    %% HTTP PUT Methods
+    %% HTTP PUT/POST Methods
+    % These methods send data to Canvas. Use with caution!
     methods
         function [success, msg] = sendGrade(obj, assignmentID, studentID, opts)
             %%SENDGRADE Sends instructor feedback and grade to a student's submission.
@@ -414,68 +415,12 @@ classdef Canvas
             msg = resp;
 
         end
-        function fileID = testFileUpload(obj, endpoint, fileName)
-            fileID = obj.uploadFile(endpoint, fileName);
-        end
-        
-    end
-
-    %% Private
-    methods (Access = private)
-        function printdb(obj, message)
-            if obj.debug
-                fprintf("[DEBUG] %s\n", message)
-            end
-        end
-        function url = buildURL(obj, endpoint, queries)
-            %BUILDURL Construct a full API URL from the endpoint and arguments
-            %   url = buildURL(obj, endpoint) returns the full URL to use
-            %   for a GET request.
-            %   Queries (optional) must be a cell array of name,value pairs
-            %   of arguments and values for the request query.
-            %   url = buildURL(obj, endpoint, {arg1,val1,arg2,val2})
-            arguments
-                obj (1,1) Canvas
-                endpoint (1,1) string = ""
-                queries (1,:) cell = {}
-            end
-
-            if endpoint == ""
-                % if no endpoint, just use course URI
-            else
-                % For all other endpoints, prepend with /
-                endpoint = "/" + endpoint;
-            end
-
-            url = matlab.net.URI(sprintf('%s/courses/%s%s', ...
-                obj.baseURL, obj.courseID, endpoint));
-
-            % Add query arguments to URL
-            if ~isempty(queries)
-                url = appendQuery(url, queries);
-            end
-        end
-
-        function resp = putPayload(obj, url, bodyStruct)
-            %PUTPAYLOAD Performs a PUT request and returns status of response.
-            arguments
-                obj (1,1) Canvas
-                url (1,1) matlab.net.URI
-                bodyStruct (:,1) struct
-            end
-
-            body_json = jsonencode(bodyStruct);
-            body = matlab.net.http.MessageBody(body_json);
-
-            req = matlab.net.http.RequestMessage('put', obj.headers, body);
-            
-            resp = [];
-
-            %resp = req.send(url);
-
-        end
         function fileID = uploadFile(obj, endpoint, fullFileName)
             %UPLOADFILE Uploads a file to Canvas and returns the file's ID.
+            %   The endpoint controls the file's access permissions.
+            %   Uploading to the course's files just places is at a generic
+            %   file. You can also use the submissions endpoint for student
+            %   feedback or submission files.
 
             arguments
                 obj (1,1) Canvas
@@ -547,6 +492,63 @@ classdef Canvas
             end
 
             fileID = testresp.Body.Data.id;
+        end
+        
+        
+    end
+
+    %% Private
+    methods (Access = private)
+        function printdb(obj, message)
+            if obj.debug
+                fprintf("[DEBUG] %s\n", message)
+            end
+        end
+        function url = buildURL(obj, endpoint, queries)
+            %BUILDURL Construct a full API URL from the endpoint and arguments
+            %   url = buildURL(obj, endpoint) returns the full URL to use
+            %   for a GET request.
+            %   Queries (optional) must be a cell array of name,value pairs
+            %   of arguments and values for the request query.
+            %   url = buildURL(obj, endpoint, {arg1,val1,arg2,val2})
+            arguments
+                obj (1,1) Canvas
+                endpoint (1,1) string = ""
+                queries (1,:) cell = {}
+            end
+
+            if endpoint == ""
+                % if no endpoint, just use course URI
+            else
+                % For all other endpoints, prepend with /
+                endpoint = "/" + endpoint;
+            end
+
+            url = matlab.net.URI(sprintf('%s/courses/%s%s', ...
+                obj.baseURL, obj.courseID, endpoint));
+
+            % Add query arguments to URL
+            if ~isempty(queries)
+                url = appendQuery(url, queries);
+            end
+        end
+
+        function resp = putPayload(obj, url, bodyStruct)
+            %PUTPAYLOAD Performs a PUT request and returns status of response.
+            arguments
+                obj (1,1) Canvas
+                url (1,1) matlab.net.URI
+                bodyStruct (:,1) struct
+            end
+
+            body_json = jsonencode(bodyStruct);
+            body = matlab.net.http.MessageBody(body_json);
+
+            req = matlab.net.http.RequestMessage('put', obj.headers, body);
+            
+            resp = [];
+
+            %resp = req.send(url);
 
         end
         function data = getPayload(obj, url)
