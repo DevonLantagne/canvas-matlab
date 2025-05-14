@@ -14,11 +14,15 @@ fprintf("\nGetting Students...\n\n")
 students = canv.getStudents(GetAvatar=true);
 
 % Display some basic info
-for i = 1:length(students)
-    fprintf('Name: %s  |  MSOEID: %s  |  Section: %s\n', ...
-        students(i).short_name, ...
-        students(i).sis_user_id,...
-        students(i).section);
+if isempty(students)
+    fprintf("No students found.\n")
+else
+    for i = 1:length(students)
+        fprintf('Name: %s  |  MSOEID: %s  |  Section: %s\n', ...
+            students(i).short_name, ...
+            students(i).sis_user_id,...
+            students(i).section);
+    end
 end
 
 %% Get Assignment Groups

@@ -247,7 +247,7 @@ classdef Canvas
 
             % Get list of all students
             students = obj.getStudents();
-            
+
             % Filter students by section if not empty
             if ~isempty(opts.Sections)
                 KeepItem = matches(vertcat(students.section), opts.Sections);
@@ -438,6 +438,9 @@ classdef Canvas
                 elseif iscell(resp.Body.Data)
                     S = normalizeStruct(resp.Body.Data); % convert cell array of hetero structures
                     data = unionStructs(data, S); % append to existing assignments
+                elseif isempty(resp.Body.Data)
+                    data = [];
+                    return
                 else
                     error("Unknown body data type.")
                 end
