@@ -344,10 +344,24 @@ classdef Canvas
             end
 
             modules = getPayload(obj, url);
-
             modules = forceStruct(modules, "items");
-
             modules = Chars2StringsRec(modules);
+        end
+        function module = getModule(obj, moduleID)
+            
+            arguments
+                obj (1,1) Canvas
+                moduleID (1,1) string
+            end
+
+            endpoint = "modules/" + moduleID;
+            url = buildURL(obj, endpoint,...
+                {"include[]", "items",...
+                "include[]", "content_details"});
+
+            module = getPayload(obj, url);
+            module = forceStruct(module, "items");
+            module = Chars2StringsRec(module);
         end
 
         % Downloads
