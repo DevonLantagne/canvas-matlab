@@ -238,6 +238,47 @@ classdef Canvas
             subs = getPayload(obj, url);
             subs = Chars2StringsRec(subs);
         end
+        
+        % Files and Folders
+        function files = getFiles(obj, opts)
+            %getFiles Retrieve metadata of all files on canvas.
+            %   Optional Parameters:
+            %   IncludeTypes - a string array of file types to filter for.
+            %   ExcludeTypes - a string array of file types to filter out.
+            %   Search - a string of a term to search for
+            arguments
+                obj (1,1) Canvas
+                opts.IncludeTypes (1,:) string = ""
+                opts.ExcludeTypes (1,:) string = ""
+                opts.Search (1,1) string = ""
+            end
+
+            endpoint = "files";
+            url = buildURL(obj, endpoint, ...
+                {'per_page', obj.perPage});
+
+            % Check IncludeTypes
+            if opts.IncludeTypes ~= ""
+                for n = 1:length(opts.IncludeTypes)
+                    url = appendQuery(url, {'content_types[]', opts.IncludeTypes(n)});
+                end
+            end
+
+            % Check ExcludeTypes
+            if opts.ExcludeTypes ~= ""
+                for n = 1:length(opts.IncludeTypes)
+                    url = appendQuery(url, {'exclude_content_types[]', opts.ExcludeTypes(n)});
+                end
+            end
+
+            % Check Search
+            if opts.Search ~= ""
+                url = appendQuery(url, {'search_term', opts.Search});
+            end
+
+            files = getPayload(obj, url);
+            files = Chars2StringsRec(files);
+        end
 
         % Downloads
         function downloadSubmissions(obj, assignmentID, downloadsPath, opts)

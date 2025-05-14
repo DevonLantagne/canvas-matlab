@@ -62,3 +62,7 @@ if false
     canv.downloadSubmissions(ThisAsmtID, downloadsPath, Sections=["002","003"]);
 end
 
+%% Get Files in the course
+if true
+    courseFiles = canv.getFiles();
+end
