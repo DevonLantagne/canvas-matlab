@@ -109,3 +109,16 @@ if true
             modules(i).items_count)
     end
 end
+
+%% Get Pages
+if true
+    fprintf("\n--- Getting Pages ---\n")
+    pages = canv.getPages();
+    
+    % Display
+    for i = 1:length(pages)
+        fprintf("[%d] %s\n",...
+            pages(i).page_id,...
+            pages(i).title)
+    end
+end

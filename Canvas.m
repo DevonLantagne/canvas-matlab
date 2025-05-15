@@ -716,6 +716,43 @@ classdef Canvas
             [file, status, resp] = deleteObject(obj, url);
         end
 
+        % Pages
+        function [pages, status, resp] = getPages(obj, opts)
+            %getPages Retrieve metadata of all pages on canvas.
+            %   Optional Parameters:
+            arguments
+                obj (1,1) Canvas
+                opts.Sort string {mustBeMember(opts.Sort, ["title", "created_at", "updated_at"])} = "updated_at"
+                opts.Order (1,1) string {mustBeMember(opts.Order, ["asc", "desc"])} = "asc"
+                opts.Search (1,1) string = ""
+                opts.Published logical = []
+            end
+
+            endpoint = "pages";
+            url = buildURL(obj, endpoint, ...
+                {'per_page', obj.perPage});
+
+            % Check IncludeTypes
+            if opts.Sort ~= ""
+                url = appendQuery(url, {'sort', opts.Sort});
+            end
+            % Check ExcludeTypes
+            if opts.Order ~= ""
+                url = appendQuery(url, {'order', opts.Order});
+            end
+            % Check Search
+            if opts.Search ~= ""
+                url = appendQuery(url, {'search_term', opts.Search});
+            end
+            % Check Search
+            if ~isempty(opts.Published)
+                url = appendQuery(url, {'published', string(opts.Published)});
+            end
+
+            [pages, status, resp] = getPayload(obj, url);
+            pages = Chars2StringsRec(pages);
+        end
+
         % Modules and Module Items
         function [modules, status, resp] = getModules(obj, opts)
             
