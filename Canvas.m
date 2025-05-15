@@ -691,6 +691,19 @@ classdef Canvas
 
             [module, status] = putPayload(obj, url, form);
         end
+        function [module, status] = deleteModule(obj, moduleID)
+            
+            arguments
+                obj (1,1) Canvas
+                moduleID (1,1) string
+            end
+
+            endpoint = "modules/" + moduleID;
+            url = buildURL(obj, endpoint);
+
+            [module, status] = deleteObject(obj, url);
+
+        end
     end
 
     %% Private
@@ -729,6 +742,35 @@ classdef Canvas
             end
         end
 
+        function [respData, status] = deleteObject(obj, url)
+            
+            arguments
+                obj (1,1) Canvas
+                url (1,1) matlab.net.URI
+            end
+
+            authheader = matlab.net.http.HeaderField(...
+                'Authorization', ['Bearer ' char(obj.token)]);
+
+            req = matlab.net.http.RequestMessage('delete', authheader);
+            resp = req.send(url);
+
+            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
+                error('Failed to delete data object: %s', char(resp.StatusLine.ReasonPhrase));
+            end
+
+            obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
+                double(resp.getFields("x-request-cost").Value), ...
+                double(resp.getFields("x-rate-limit-remaining").Value)))
+
+            respData = resp.Body.Data;
+            if resp.Body.ContentType.Subtype == "json"
+                respData = Chars2StringsRec(respData);
+            end
+
+            status = resp.StatusLine;
+
+        end
         function [respData, status] = putPayload(obj, url, form)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
             arguments
@@ -745,13 +787,17 @@ classdef Canvas
             req = matlab.net.http.RequestMessage('put', postheaders, form);
             resp = req.send(url);
 
-            if resp.StatusCode == matlab.net.http.StatusCode.OK
-                respData = resp.Body.Data;
-                if resp.Body.ContentType.Subtype == "json"
-                    respData = Chars2StringsRec(respData);
-                end
-            else
-                respData = [];
+            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
+                error('Failed to put data: %s', char(resp.StatusLine.ReasonPhrase));
+            end
+
+            obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
+                double(resp.getFields("x-request-cost").Value), ...
+                double(resp.getFields("x-rate-limit-remaining").Value)))
+
+            respData = resp.Body.Data;
+            if resp.Body.ContentType.Subtype == "json"
+                respData = Chars2StringsRec(respData);
             end
 
             status = resp.StatusLine;
@@ -772,13 +818,17 @@ classdef Canvas
             req = matlab.net.http.RequestMessage('post', postheaders, form);
             resp = req.send(url);
 
-            if resp.StatusCode == matlab.net.http.StatusCode.OK
-                respData = resp.Body.Data;
-                if resp.Body.ContentType.Subtype == "json"
-                    respData = Chars2StringsRec(respData);
-                end
-            else
-                respData = [];
+            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
+                error('Failed to post data: %s', char(resp.StatusLine.ReasonPhrase));
+            end
+
+            obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
+                double(resp.getFields("x-request-cost").Value), ...
+                double(resp.getFields("x-rate-limit-remaining").Value)))
+
+            respData = resp.Body.Data;
+            if resp.Body.ContentType.Subtype == "json"
+                respData = Chars2StringsRec(respData);
             end
 
             status = resp.StatusLine;
@@ -847,7 +897,7 @@ end
 
 function timechar = local2UTCchar(localDT)
 localDT.TimeZone = 'UTC';
-timechar = char(opts.UnlockAt, 'yyyy-MM-dd''T''HH:mm:ss''Z''');
+timechar = char(localDT, 'yyyy-MM-dd''T''HH:mm:ss''Z''');
 end
 
 function url = appendQuery(url, queries)
