@@ -29,7 +29,7 @@ input("Press ENTER to continue");
 
 fprintf("Deleting File...\n")
 [~,status] = canv.deleteFile(file.id);
-fprintf("File deleted\n")
+fprintf("File deleted. Check Canvas.\n")
 
 
 %% Test Create Module

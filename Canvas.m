@@ -184,6 +184,7 @@ classdef Canvas
                 'include[]',   'assignments'});
 
             [asmt_grps, status, resp] = getPayload(obj, url);
+            if isempty(asmt_grps); return; end
 
             % Force "assignments" to be structs
             asmt_grps = forceStruct(asmt_grps, "assignments");
@@ -257,6 +258,7 @@ classdef Canvas
                 opts.Comment (1,1) string = []
                 opts.FileNames (:,1) string = []
             end
+            error("Not fully implemented")
 
             endpoint = "assignments/" + assignmentID + "/submissions/" + studentID;
             url = buildURL(obj, endpoint);
@@ -299,6 +301,7 @@ classdef Canvas
             url = buildURL(obj, endpoint);
 
             [quota, status, resp] = getPayload(obj, url);
+            if isempty(quota); return; end
             quota = Chars2StringsRec(quota);
 
             quota.quota_remaining = quota.quota - quota.quota_used;
@@ -368,6 +371,7 @@ classdef Canvas
                 {'per_page', obj.perPage});
 
             [folders, status, resp] = getPayload(obj, url);
+            if isempty(folders); return; end
             folders = Chars2StringsRec(folders);
 
             % Sort folder tree
@@ -473,7 +477,8 @@ classdef Canvas
             [uploadData, status] = postPayload(obj, url, form);
 
             if status.StatusCode ~= matlab.net.http.StatusCode.OK
-                error("Failed to request file upload: %s", char(status.StatusLine.ReasonPhrase))
+                file = [];
+                return
             end
 
             % Parse the response
@@ -496,7 +501,7 @@ classdef Canvas
 
             % Send the request to the upload URL (no auth header needed)
             [file, status, resp] = postPayload(obj, uploadURL, uploadForm, Header=[]);
-            
+            if isempty(file); return; end
             % Send the request to the upload URL (no auth header needed)
             % uploadReq = matlab.net.http.RequestMessage('post', [], uploadForm);
             % uploadResp = uploadReq.send(uploadURL);
@@ -548,6 +553,7 @@ classdef Canvas
             end
 
             [modules, status, resp] = getPayload(obj, url);
+            if isempty(modules); return; end
             modules = forceStruct(modules, "items");
             modules = Chars2StringsRec(modules);
         end
@@ -564,6 +570,7 @@ classdef Canvas
                 "include[]", "content_details"});
 
             [module, status, resp] = getPayload(obj, url);
+            if isempty(module); return; end
             module = forceStruct(module, "items");
             module = Chars2StringsRec(module);
         end
@@ -685,10 +692,18 @@ classdef Canvas
             if ~isfolder(downloadsPath); mkdir(downloadsPath);end
 
             % Get the submissions for the assignment
-            subs = obj.getSubmissions(assignmentID);
+            [subs, status] = obj.getSubmissions(assignmentID);
+            if isempty(subs)
+                error("Cound not get submissions: (%d) %s", ...
+                    status.StatusCode, status.ReasonPhrase)
+            end
 
             % Get list of all students
-            students = obj.getStudents();
+            [students, status] = obj.getStudents();
+            if isempty(students)
+                error("Cound not get students: (%d) %s", ...
+                    status.StatusCode, status.ReasonPhrase)
+            end
 
             % Filter students by section if not empty
             if ~isempty(opts.Sections)
