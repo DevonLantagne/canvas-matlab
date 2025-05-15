@@ -241,6 +241,18 @@ classdef Canvas
         end
         
         % Files and Folders
+        function quota = getQuota(obj)
+            
+            endpoint = "files/quota";
+            url = buildURL(obj, endpoint);
+
+            quota = getPayload(obj, url);
+            quota = Chars2StringsRec(quota);
+
+            quota.quota_remaining = quota.quota - quota.quota_used;
+            quota.quota_used_percent = quota.quota_used / quota.quota;
+            quota.quota_remaining_percent = 1 - quota.quota_used_percent;
+        end
         function files = getFiles(obj, opts)
             %getFiles Retrieve metadata of all files on canvas.
             %   Optional Parameters:
