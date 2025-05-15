@@ -565,58 +565,63 @@ classdef Canvas
             % This requires a POST request with multipart/form-data.
             url = buildURL(obj, endpoint);
 
-            form = matlab.net.http.io.FormProvider('name', fileName, 'size', num2str(fileSize));
+            form = matlab.net.http.io.FormProvider(...
+                'name', fileName, ...
+                'size', num2str(fileSize));
+            
+            [uploadData, status] = postPayload(obj, url, form);
 
             % Only send auth header.
-            authheader = matlab.net.http.HeaderField(...
-                'Authorization', ['Bearer ' char(obj.token)]);
-            
-            % Send the request
-            req = matlab.net.http.RequestMessage('post', authheader, form);
-            resp = req.send(url);
+            % authheader = matlab.net.http.HeaderField(...
+            %     'Authorization', ['Bearer ' char(obj.token)]);
+            % 
+            % % Send the request
+            % req = matlab.net.http.RequestMessage('post', authheader, form);
+            % resp = req.send(url);
 
-            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
-                error("Failed to request file upload: %s", char(resp.StatusLine.ReasonPhrase))
+            if status.StatusCode ~= matlab.net.http.StatusCode.OK
+                error("Failed to request file upload: %s", char(status.StatusLine.ReasonPhrase))
             end
 
             % Parse the response
-            uploadData = resp.Body.Data;
             uploadURL = uploadData.upload_url;
             uploadParams = uploadData.upload_params;
 
             % Step 2: Upload the File
-            % Start forming multipart forms
+            % Send a form with all returned args from first request, then
+            % add the file provider.
             multipart = {};
-            
             % Add the form fields from Canvas
             fields = fieldnames(uploadParams);
             for i = 1:numel(fields)
                 multipart = [multipart, fields(i), {uploadParams.(fields{i})}];
             end
-            
             % Add the actual file to the multipart
             multipart = [multipart, {'file'}, {matlab.net.http.io.FileProvider(fullFileName)}];
 
             uploadForm = matlab.net.http.io.MultipartFormProvider(multipart{:});
+
+            % Send the request to the upload URL (no auth header needed)
+            [NewFile, status] = postPayload(obj, uploadURL, uploadForm, Header=[]);
             
             % Send the request to the upload URL (no auth header needed)
-            uploadReq = matlab.net.http.RequestMessage('post', [], uploadForm);
-            uploadResp = uploadReq.send(uploadURL);
+            % uploadReq = matlab.net.http.RequestMessage('post', [], uploadForm);
+            % uploadResp = uploadReq.send(uploadURL);
 
             % Check if good upload:
             % Get "location" from response
             % if 3XX, perform a GET to the same location to complete the
             % upload.
-            if uploadResp.StatusCode == matlab.net.http.StatusCode.Created
-                location = uploadResp.Body.Data.location;
-                testURL = matlab.net.URI(location);
-                testReq = matlab.net.http.RequestMessage('GET', obj.headers);
-                testresp = testReq.send(testURL);
+            if status.StatusCode == matlab.net.http.StatusCode.Created
+                fileID = NewFile.id;
+                % testURL = matlab.net.URI(uploadResp.location);
+                % testReq = matlab.net.http.RequestMessage('GET', obj.headers);
+                % testresp = testReq.send(testURL);
             else
                 error("A non 201 code was returned in the response. Incomplete implementation.")
+
             end
 
-            fileID = testresp.Body.Data.id;
         end
         
         % Modules
@@ -719,10 +724,27 @@ classdef Canvas
 
     %% Private
     methods (Access = private)
+        % Utility
         function printdb(obj, message)
             if obj.debug
                 fprintf("[DEBUG] %s\n", message)
             end
+        end
+        function printdb_limits(obj, resp)
+            % This function prints a debug statement (printdb) if the
+            % response (resp) has limit headers. printdb checks if
+            % debugging is enabled.
+            CostHeader = resp.getFields("x-request-cost");
+            RemHeader = resp.getFields("x-rate-limit-remaining");
+
+            if isempty(CostHeader) || isempty(RemHeader)
+                % no data to print, abort
+                return
+            end
+            
+            obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
+                double(resp.getFields("x-request-cost").Value), ...
+                double(resp.getFields("x-rate-limit-remaining").Value)))
         end
         function url = buildURL(obj, endpoint, queries)
             %BUILDURL Construct a full API URL from the endpoint and arguments
@@ -782,29 +804,27 @@ classdef Canvas
             status = resp.StatusLine;
 
         end
-        function [respData, status] = putPayload(obj, url, form)
+        function [respData, status] = putPayload(obj, url, form, opts)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
+            %   HTTP PUT is mainly used to modify existing data on Canvas.
             arguments
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
                 form
+                opts.Header = [
+                    matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
+                    matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
+                    ];
             end
-
-            postheaders = [
-                matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
-                matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
-                ];
             
-            req = matlab.net.http.RequestMessage('put', postheaders, form);
+            req = matlab.net.http.RequestMessage('put', opts.Header, form);
             resp = req.send(url);
 
             if resp.StatusCode ~= matlab.net.http.StatusCode.OK
                 error('Failed to put data: %s', char(resp.StatusLine.ReasonPhrase));
             end
 
-            obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
-                double(resp.getFields("x-request-cost").Value), ...
-                double(resp.getFields("x-rate-limit-remaining").Value)))
+            obj.printdb_limits(resp)
 
             respData = resp.Body.Data;
             if resp.Body.ContentType.Subtype == "json"
@@ -813,29 +833,28 @@ classdef Canvas
 
             status = resp.StatusLine;
         end
-        function [respData, status] = postPayload(obj, url, form)
+        function [respData, status] = postPayload(obj, url, form, opts)
             %POSTPAYLOAD Performs a POST request and returns status of response.
+            %   HTTP Post is mainly used to create data on Canvas
             arguments
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
                 form
+                opts.Header = [
+                    matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
+                    matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
+                    ];
             end
-
-            postheaders = [
-                matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
-                matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
-                ];
             
-            req = matlab.net.http.RequestMessage('post', postheaders, form);
+            req = matlab.net.http.RequestMessage('post', opts.Header, form);
             resp = req.send(url);
 
-            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
+            if ~(resp.StatusCode == matlab.net.http.StatusCode.OK || ...
+                    resp.StatusCode == matlab.net.http.StatusCode.Created)
                 error('Failed to post data: %s', char(resp.StatusLine.ReasonPhrase));
             end
 
-            obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
-                double(resp.getFields("x-request-cost").Value), ...
-                double(resp.getFields("x-rate-limit-remaining").Value)))
+            obj.printdb_limits(resp)
 
             respData = resp.Body.Data;
             if resp.Body.ContentType.Subtype == "json"
@@ -865,9 +884,7 @@ classdef Canvas
                     error('Failed to fetch data: %s', char(resp.StatusLine.ReasonPhrase));
                 end
 
-                obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
-                    double(resp.getFields("x-request-cost").Value), ...
-                    double(resp.getFields("x-rate-limit-remaining").Value)))
+                obj.printdb_limits(resp)
 
                 if isstruct(resp.Body.Data)
                     data = unionStructs(data, resp.Body.Data);
@@ -886,7 +903,6 @@ classdef Canvas
                 if isempty(linkHeader)
                     break;
                 end
-
                 % Look for rel="next" in the Link header
                 links = parseLinkHeader(linkHeader.Value);
                 % Check if there is a 'next' field in structure
