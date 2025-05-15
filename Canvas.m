@@ -540,7 +540,9 @@ classdef Canvas
             msg = resp;
 
         end
-        function fileID = uploadFile(obj, endpoint, fullFileName)
+        
+        % Files
+        function [file, status, resp] = uploadFile(obj, endpoint, fullFileName)
             %UPLOADFILE Uploads a file to Canvas and returns the file's ID.
             %   The endpoint controls the file's access permissions.
             %   Uploading to the course's files just places is at a generic
@@ -602,7 +604,7 @@ classdef Canvas
             uploadForm = matlab.net.http.io.MultipartFormProvider(multipart{:});
 
             % Send the request to the upload URL (no auth header needed)
-            [NewFile, status] = postPayload(obj, uploadURL, uploadForm, Header=[]);
+            [file, status, resp] = postPayload(obj, uploadURL, uploadForm, Header=[]);
             
             % Send the request to the upload URL (no auth header needed)
             % uploadReq = matlab.net.http.RequestMessage('post', [], uploadForm);
@@ -613,7 +615,6 @@ classdef Canvas
             % if 3XX, perform a GET to the same location to complete the
             % upload.
             if status.StatusCode == matlab.net.http.StatusCode.Created
-                fileID = NewFile.id;
                 % testURL = matlab.net.URI(uploadResp.location);
                 % testReq = matlab.net.http.RequestMessage('GET', obj.headers);
                 % testresp = testReq.send(testURL);
@@ -623,7 +624,19 @@ classdef Canvas
             end
 
         end
-        
+        function [file, status, resp] = deleteFile(obj, fileID)
+
+            arguments
+                obj (1,1) Canvas
+                fileID (1,1) string
+            end
+
+            endpoint = "files/" + fileID;
+            url = buildURL(obj, endpoint, [], UseCourse=false);
+
+            [file, status, resp] = deleteObject(obj, url);
+        end
+
         % Modules
         function [module, status] = createModule(obj, name, opts)
             % 
@@ -746,7 +759,7 @@ classdef Canvas
                 double(resp.getFields("x-request-cost").Value), ...
                 double(resp.getFields("x-rate-limit-remaining").Value)))
         end
-        function url = buildURL(obj, endpoint, queries)
+        function url = buildURL(obj, endpoint, queries, opts)
             %BUILDURL Construct a full API URL from the endpoint and arguments
             %   url = buildURL(obj, endpoint) returns the full URL to use
             %   for a GET request.
@@ -757,17 +770,23 @@ classdef Canvas
                 obj (1,1) Canvas
                 endpoint (1,1) string = ""
                 queries (1,:) cell = {}
+                opts.UseCourse (1,1) logical = true
             end
 
-            if endpoint == ""
-                % if no endpoint, just use course URI
-            else
+            urlStr = obj.baseURL;
+
+            if opts.UseCourse
+                urlStr = urlStr + "/courses/" + obj.courseID;
+            end
+
+            if endpoint ~= ""
                 % For all other endpoints, prepend with /
+                % Otherwise we are left with course URI
                 endpoint = "/" + endpoint;
             end
+            urlStr = urlStr + endpoint;
 
-            url = matlab.net.URI(sprintf('%s/courses/%s%s', ...
-                obj.baseURL, obj.courseID, endpoint));
+            url = matlab.net.URI(urlStr);
 
             % Add query arguments to URL
             if ~isempty(queries)
