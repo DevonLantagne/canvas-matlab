@@ -382,6 +382,60 @@ classdef Canvas
             [folder, status, resp] = getPayload(obj, url);
             folder = Chars2StringsRec(folder);
         end
+        function [folder, status, resp] = createFolder(obj, name, opts)
+            
+            arguments
+                obj (1,1) Canvas
+                name (1,1) string
+                opts.ParentID (1,1) string = ""
+                opts.ParentPath (1,1) string = ""
+                opts.UnlockAt (1,1) datetime = NaT
+                opts.LockAt (1,1) datetime = NaT
+                opts.Locked logical = []
+                opts.Hidden logical = []
+                opts.Position = []
+            end
+
+            endpoint = "folders";
+            url = buildURL(obj, endpoint);
+
+            formArgs = {"name", name};
+
+            % Guard
+            if opts.ParentID ~= "" && opts.ParentPath ~= ""
+                error("ParentID and ParentPath are mutually exclusive.")
+            end
+
+            if opts.ParentID ~= ""
+                formArgs = [formArgs, {"parent_folder_id", opts.ParentID}];
+            end
+            if opts.ParentPath ~= ""
+                formArgs = [formArgs, {"parent_folder_path", opts.ParentPath}];
+            end
+
+            if ~isnat(opts.UnlockAt)
+                formArgs = [formArgs, {"unlock_at", local2ISOchar(opts.UnlockAt)}];
+            end
+            if ~isnat(opts.LockAt)
+                formArgs = [formArgs, {"unlock_at", local2ISOchar(opts.LockAt)}];
+            end
+            if ~isempty(opts.Locked)
+                formArgs = [formArgs, {"locked", string(opts.Locked)}];
+            end
+
+            if ~isempty(opts.Hidden)
+                formArgs = [formArgs, {"hidden", string(opts.Hidden)}];
+            end
+
+            if ~isempty(opts.Position)
+                formArgs = [formArgs, {"position", opts.Position}];
+            end
+
+            form = matlab.net.http.io.FormProvider(formArgs{:});
+
+            [folder, status, resp] = postPayload(obj, url, form);
+
+        end
         function [file, status, resp] = uploadFile(obj, endpoint, fullFileName)
             %UPLOADFILE Uploads a file to Canvas and returns the file's ID.
             %   The endpoint controls the file's access permissions.
@@ -573,7 +627,7 @@ classdef Canvas
             end
 
             if ~isempty(opts.Publish)
-                formArgs = [formArgs, {"module[published]", opts.Publish}];
+                formArgs = [formArgs, {"module[published]", string(opts.Publish)}];
             end
 
             if isempty(formArgs)
@@ -950,6 +1004,11 @@ end
 % These functions are encapsulated inside this .m file and cannot be
 % accessed outside the class.
 
+function NewPath = sanitizePath(OldPath)
+% Canvas only uses forward slashes / for filepath values
+NewPath = strrep(OldPath, '\', '/');
+end
+
 function timechar = local2ISOchar(localDT)
 if ~isa(localDT, 'datetime')
     error('Input must be a datetime object');
@@ -961,9 +1020,6 @@ end
 % Format with ISO 8601 and timezone offset (±hh:mm)
 localDT.Format = 'yyyy-MM-dd''T''HH:mm:ssXXX';
 timechar = char(localDT);
-
-%localDT.TimeZone = 'UTC';
-%timechar = char(localDT, 'yyyy-MM-dd''T''HH:mm:ss''Z''');
 end
 
 function url = appendQuery(url, queries)
