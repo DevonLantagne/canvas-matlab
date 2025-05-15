@@ -18,10 +18,13 @@ fileInfo = dir("testFile.txt");
 if isempty(fileInfo); error("File not found."); end
 testFile = fullfile(fileInfo.folder, fileInfo.name);
 
-endpoint = "files"; % generic file upload for the course
 fprintf("Uploading File...\n")
-file = canv.uploadFile(endpoint, testFile);
-fprintf("File uploaded. Check Canvas.\n")
+file = canv.uploadFile("files", testFile);
+if isempty(file)
+    fprintf("UNABLE TO UPLOAD FILE\n")
+else
+    fprintf("File uploaded. Check Canvas.\n")
+end
 
 %% File Delete Test
 % Deletes the testFile.txt that was uploaded with the upload test.

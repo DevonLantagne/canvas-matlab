@@ -119,6 +119,11 @@ classdef Canvas
 
     %% HTTP Methods
     methods
+        % Course
+        function [course, status, resp] = getCourse(obj)
+            
+        end
+        
         % Students
         function [students, status, resp] = getStudents(obj, opts)
             %GETSTUDENTS Retrieve all active students enrolled in the course
@@ -242,13 +247,21 @@ classdef Canvas
             [subs, status, resp] = getPayload(obj, url);
             subs = Chars2StringsRec(subs);
         end
-        function [success, msg] = sendGrade(obj, assignmentID, studentID, opts)
+        function [submission, status, resp] = sendGrade(obj, assignmentID, studentID, opts)
             %%SENDGRADE Sends instructor feedback and grade to a student's submission.
             %   Can also send additional information with the grade posting
-            %   such as comments or files. 
+            %   such as comments or files. At least one optional argument
+            %   must be provided.
+            %
             %   Optional Arguments:
-            %   Grade - A grade to be given for the submission. Can be a
-            %   decimal number (for raw score), 
+            %   Grade - A grade to be given for the submission:
+            %       Floating point value "13.5" is absolute points;
+            %       A percentage "40%";
+            %       Letter grade "B" will be given the highest percentage
+            %           for that letter.
+            %       Pass/Fail "pass", "complete", "fail", "incomplete" will
+            %           grant 100% or 0%.
+            %   Comment - A string of text to post as a simple comment.
             %   
             arguments
                 obj (1,1) Canvas
@@ -260,40 +273,175 @@ classdef Canvas
             end
             error("Not fully implemented")
 
+            submission = [];
+            status = [];
+            resp = [];
+
             endpoint = "assignments/" + assignmentID + "/submissions/" + studentID;
             url = buildURL(obj, endpoint);
 
-            % Form data structure
-            bodyStruct = struct();
+            formArgs = {}
 
             % Append new grade
             if ~isempty(opts.Grade)
-                bodyStruct.submission = struct('posted_grade', opts.Grade);
+                formArgs = [formArgs, {"submission[posted_grade]", string(opts.Grade)}];
             end
 
             % Append comment
             if ~isempty(opts.Comment)
-                bodyStruct.comment = struct('text_comment', opts.Comment);
+                formArgs = [formArgs, {"comment[text_comment]", opts.Comment}];
             end
 
             % Append files
             if ~isempty(opts.FileNames)
-                % TODO
-                fileEndpoint = "assignments/" + assignmentID + ...
-                    "/submissions/" + studentID + "/comments/files";
                 for fileName = opts.FileNames
-                    
+                    % Upload File
+                    [file, status, resp] = uploadFile(obj, "comment", fileName,...
+                        AssignmentID=assignmentID, StudentID=studentID);
+                    if isempty(file)
+                        return
+                    end
+                    % Attach ID to request arguments
+                    formArgs = [formArgs, {"comment[file_ids][]", file.id}];
                 end
             end
 
-            % send PUT request
-            resp = putPayload(obj, url, bodyStruct);
-
-            success = [];
-            msg = resp;
+            if isempty(formArgs)
+                warning("No form entries")
+                return
+            end
+            
+            form = matlab.net.http.io.FormProvider(formArgs{:});
+            [submission, status, resp] = putPayload(obj, url, form);
 
         end
-        
+        function downloadSubmissions(obj, assignmentID, downloadsPath, opts)
+            %downloadSubmissions Downloads all student submissions for an assignment
+            %   A folder will be created from the downloadsPath. Inside,
+            %   each student will have their own folder with all
+            %   submissions. Attempts will be indicated on filenames.
+            %   If files already exist, they will not be downloaded.
+            %   Comment files will always be overwritten.
+            %   Can also specify sections to filter.
+
+            arguments
+                obj (1,1) Canvas
+                assignmentID (1,1) double
+                downloadsPath (1,1) string
+                opts.Sections (1,:) string = []
+            end
+
+            % Make directory if it does not exist
+            if ~isfolder(downloadsPath); mkdir(downloadsPath);end
+
+            % Get the submissions for the assignment
+            [subs, status] = obj.getSubmissions(assignmentID);
+            if isempty(subs)
+                error("Cound not get submissions: (%d) %s", ...
+                    status.StatusCode, status.ReasonPhrase)
+            end
+
+            % Get list of all students
+            [students, status] = obj.getStudents();
+            if isempty(students)
+                error("Cound not get students: (%d) %s", ...
+                    status.StatusCode, status.ReasonPhrase)
+            end
+
+            % Filter students by section if not empty
+            if ~isempty(opts.Sections)
+                KeepItem = matches(vertcat(students.section), opts.Sections);
+                students(~KeepItem) = []; % remove
+            end
+
+            % For each student, find all their submissions and download
+            for st = 1:length(students)
+                % Get student metadata
+                ThisStudentID = students(st).id;
+                ThisStudentName = students(st).name;
+
+                obj.printdb(sprintf("Checking submissions for %s (%d/%d)", ...
+                    ThisStudentName, st, length(students)))
+
+                % Make student folder if not exist
+                StudentFolder = fullfile(downloadsPath, ThisStudentName);
+                if ~isfolder(StudentFolder); mkdir(StudentFolder);end
+
+                % Get submission for this student
+                % The include[]=submission_history argument guarantees only
+                % one "submission" row in the subs structure. Multiple
+                % submissions are contained within that row object.
+                ThisSub = subs(vertcat(subs.user_id) == ThisStudentID);
+
+                % Write submission comments (can happen without actual
+                % submission)
+                if ~isempty(ThisSub.submission_comments)
+                    % make text file and enter comments:
+                    obj.printdb("Generating comments.txt")
+                    fid = fopen(fullfile(StudentFolder, 'comments.txt'), 'w');
+                    for cmt = 1:length(ThisSub.submission_comments)
+                        ThisCmt = ThisSub.submission_comments(cmt);
+                        fprintf(fid, "Attempt %d: %s: %s\n", ...
+                            ThisCmt.attempt,...
+                            ThisCmt.author_name,...
+                            ThisCmt.comment);
+                    end
+                    fclose(fid);
+                end
+
+                % Guard if an actual submission was made
+                if isempty(ThisSub) || isempty(ThisSub.submission_type)
+                    obj.printdb("No submission found, generating empty.txt")
+                    fid = fopen(fullfile(StudentFolder, 'empty.txt'), 'w');
+                    fclose(fid);
+                    continue
+                end
+
+                % Download Attachments
+                if ~isempty(ThisSub.submission_history)
+                    % For every submission (attempt)
+                    for attempt = 1:length(ThisSub.submission_history)
+                        ThisAttempt = ThisSub.submission_history(attempt);
+
+                        % Check due dates
+                        submitDate = datetime(ThisAttempt.submitted_at, ...
+                            'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z''', ...
+                            'TimeZone', 'UTC');
+                        dueDate = datetime(ThisAttempt.cached_due_date, ...
+                            'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z''', ...
+                            'TimeZone', 'UTC');
+                        lateness = submitDate - dueDate;
+                        if lateness > seconds(0)
+                            obj.printdb(sprintf("Attempt %d: generating LATE.txt", ThisAttempt.attempt))
+                            LateString = sprintf("attempt %d LATE %.0f hours.txt", ...
+                                ThisAttempt.attempt, hours(lateness));
+                            fid = fopen(fullfile(StudentFolder, LateString), 'w');
+                            fclose(fid);
+                        end
+
+                        % For all attachments in this attempt
+                        for a = 1:length(ThisAttempt.attachments)
+                            ThisAttachment = ThisAttempt.attachments(a);
+                            filename = sprintf('attempt%d_%s', ThisAttempt.attempt, ThisAttachment.display_name);
+                            filepath = fullfile(StudentFolder, filename);
+                            % Check if file already exists (skip if true)
+                            if isfile(filepath)
+                                obj.printdb(sprintf("Already Exists (skipping): %s", ThisAttachment.display_name))
+                                continue
+                            end
+                            % Download
+                            try
+                                obj.printdb(sprintf("Downloading %s", ThisAttachment.display_name))
+                                websave(filepath, ThisAttachment.url);
+                            catch e
+                                warning('Failed to download: %s\nError: %s', a.url, e.message);
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
         % Files and Folders
         function [quota, status, resp] = getQuota(obj)
             
@@ -445,17 +593,47 @@ classdef Canvas
             [folder, status, resp] = postPayload(obj, url, form);
 
         end
-        function [file, status, resp] = uploadFile(obj, endpoint, fullFileName)
+        function [file, status, resp] = uploadFile(obj, uploadType, fullFileName, opts)
             %UPLOADFILE Uploads a file to Canvas and returns the file's ID.
-            %   The endpoint controls the file's access permissions.
-            %   Uploading to the course's files just places is at a generic
-            %   file. You can also use the submissions endpoint for student
-            %   feedback or submission files.
+            %   The uploadType controls the file permissions. If uploadType
+            %   is the following:
+            %       "files" - generic file upload. User can supply which
+            %       folder to place the file using FolderID or FolderPath.
+            %       If none is provided, the file will be placed in the
+            %       default folder "unfiled".
+            %       "comment" - a file used to attach to a student's
+            %       assignment submission. The use MUST supply the
+            %       AssignmentID and the StudentID.
+            %       
 
             arguments
                 obj (1,1) Canvas
-                endpoint (1,1) string
+                uploadType (1,1) string {mustBeMember(uploadType, "files", "comment")}
                 fullFileName (1,1) string
+                opts.FolderID (1,1) string = ""
+                opts.FolderPath (1,1) string = ""
+                opts.AssignmentID (1,1) string = ""
+                opts.StudentID (1,1) string = ""
+            end
+
+            switch uploadType
+                case "files"
+                    % Check requirements
+                    if opts.FolderID ~= "" && opts.FolderPath ~= ""
+                        error("ParentID and ParentPath are mutually exclusive.")
+                    end
+                    % Set endpoint
+                    endpoint = "files";
+
+                case "comment"
+                    error("Untested and unsafe!")
+                    % Check requirements
+                    if opts.AssignmentID=="" || opts.StudentID==""
+                        error("If using ""comment"", you must also provide AssignmentID and StudentID.")
+                    end
+                    % Set endpoint
+                    endpoint = "assignments/" + opts.AssignmentID + ...
+                        "/submissions/" + opts.StudentID + "/files";
             end
 
             % Get information about the file the user wants to upload
@@ -470,9 +648,15 @@ classdef Canvas
             % This requires a POST request with multipart/form-data.
             url = buildURL(obj, endpoint);
 
-            form = matlab.net.http.io.FormProvider(...
-                'name', fileName, ...
-                'size', num2str(fileSize));
+            formArgs = {'name', fileName, 'size', num2str(fileSize)};
+            if opts.FolderID ~= ""
+                formArgs = [formArgs, {"parent_folder_id", opts.FolderID}];
+            end
+            if opts.FolderPath ~= ""
+                opts.FolderPath = sanitizePath(opts.FolderPath);
+                formArgs = [formArgs, {"parent_folder_path", opts.FolderPath}];
+            end
+            form = matlab.net.http.io.FormProvider(formArgs{:});
             
             [uploadData, status] = postPayload(obj, url, form);
 
@@ -516,7 +700,6 @@ classdef Canvas
                 % testresp = testReq.send(testURL);
             else
                 error("A non 201 code was returned in the response. Incomplete implementation.")
-
             end
 
         end
@@ -533,7 +716,7 @@ classdef Canvas
             [file, status, resp] = deleteObject(obj, url);
         end
 
-        % Modules
+        % Modules and Module Items
         function [modules, status, resp] = getModules(obj, opts)
             
             arguments
@@ -789,135 +972,6 @@ classdef Canvas
 
         end
     
-
-        % Downloads
-        function downloadSubmissions(obj, assignmentID, downloadsPath, opts)
-            %downloadSubmissions Downloads all student submissions for an assignment
-            %   A folder will be created from the downloadsPath. Inside,
-            %   each student will have their own folder with all
-            %   submissions. Attempts will be indicated on filenames.
-            %   If files already exist, they will not be downloaded.
-            %   Comment files will always be overwritten.
-            %   Can also specify sections to filter.
-
-            arguments
-                obj (1,1) Canvas
-                assignmentID (1,1) double
-                downloadsPath (1,1) string
-                opts.Sections (1,:) string = []
-            end
-
-            % Make directory if it does not exist
-            if ~isfolder(downloadsPath); mkdir(downloadsPath);end
-
-            % Get the submissions for the assignment
-            [subs, status] = obj.getSubmissions(assignmentID);
-            if isempty(subs)
-                error("Cound not get submissions: (%d) %s", ...
-                    status.StatusCode, status.ReasonPhrase)
-            end
-
-            % Get list of all students
-            [students, status] = obj.getStudents();
-            if isempty(students)
-                error("Cound not get students: (%d) %s", ...
-                    status.StatusCode, status.ReasonPhrase)
-            end
-
-            % Filter students by section if not empty
-            if ~isempty(opts.Sections)
-                KeepItem = matches(vertcat(students.section), opts.Sections);
-                students(~KeepItem) = []; % remove
-            end
-
-            % For each student, find all their submissions and download
-            for st = 1:length(students)
-                % Get student metadata
-                ThisStudentID = students(st).id;
-                ThisStudentName = students(st).name;
-
-                obj.printdb(sprintf("Checking submissions for %s (%d/%d)", ...
-                    ThisStudentName, st, length(students)))
-
-                % Make student folder if not exist
-                StudentFolder = fullfile(downloadsPath, ThisStudentName);
-                if ~isfolder(StudentFolder); mkdir(StudentFolder);end
-
-                % Get submission for this student
-                % The include[]=submission_history argument guarantees only
-                % one "submission" row in the subs structure. Multiple
-                % submissions are contained within that row object.
-                ThisSub = subs(vertcat(subs.user_id) == ThisStudentID);
-
-                % Write submission comments (can happen without actual
-                % submission)
-                if ~isempty(ThisSub.submission_comments)
-                    % make text file and enter comments:
-                    obj.printdb("Generating comments.txt")
-                    fid = fopen(fullfile(StudentFolder, 'comments.txt'), 'w');
-                    for cmt = 1:length(ThisSub.submission_comments)
-                        ThisCmt = ThisSub.submission_comments(cmt);
-                        fprintf(fid, "Attempt %d: %s: %s\n", ...
-                            ThisCmt.attempt,...
-                            ThisCmt.author_name,...
-                            ThisCmt.comment);
-                    end
-                    fclose(fid);
-                end
-
-                % Guard if an actual submission was made
-                if isempty(ThisSub) || isempty(ThisSub.submission_type)
-                    obj.printdb("No submission found, generating empty.txt")
-                    fid = fopen(fullfile(StudentFolder, 'empty.txt'), 'w');
-                    fclose(fid);
-                    continue
-                end
-
-                % Download Attachments
-                if ~isempty(ThisSub.submission_history)
-                    % For every submission (attempt)
-                    for attempt = 1:length(ThisSub.submission_history)
-                        ThisAttempt = ThisSub.submission_history(attempt);
-
-                        % Check due dates
-                        submitDate = datetime(ThisAttempt.submitted_at, ...
-                            'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z''', ...
-                            'TimeZone', 'UTC');
-                        dueDate = datetime(ThisAttempt.cached_due_date, ...
-                            'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss''Z''', ...
-                            'TimeZone', 'UTC');
-                        lateness = submitDate - dueDate;
-                        if lateness > seconds(0)
-                            obj.printdb(sprintf("Attempt %d: generating LATE.txt", ThisAttempt.attempt))
-                            LateString = sprintf("attempt %d LATE %.0f hours.txt", ...
-                                ThisAttempt.attempt, hours(lateness));
-                            fid = fopen(fullfile(StudentFolder, LateString), 'w');
-                            fclose(fid);
-                        end
-
-                        % For all attachments in this attempt
-                        for a = 1:length(ThisAttempt.attachments)
-                            ThisAttachment = ThisAttempt.attachments(a);
-                            filename = sprintf('attempt%d_%s', ThisAttempt.attempt, ThisAttachment.display_name);
-                            filepath = fullfile(StudentFolder, filename);
-                            % Check if file already exists (skip if true)
-                            if isfile(filepath)
-                                obj.printdb(sprintf("Already Exists (skipping): %s", ThisAttachment.display_name))
-                                continue
-                            end
-                            % Download
-                            try
-                                obj.printdb(sprintf("Downloading %s", ThisAttachment.display_name))
-                                websave(filepath, ThisAttachment.url);
-                            catch e
-                                warning('Failed to download: %s\nError: %s', a.url, e.message);
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
     end
 
     %% Private
