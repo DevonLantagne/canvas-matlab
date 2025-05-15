@@ -112,12 +112,10 @@ classdef Canvas
         end
     end
 
-    %% HTTP GET Methods
-    % These methods only get data from Canvas and do not modify data on
-    % Canvas.
+    %% HTTP Methods
     methods
-        % Student Info
-        function students = getStudents(obj, opts)
+        % Students
+        function [students, status, resp] = getStudents(obj, opts)
             %GETSTUDENTS Retrieve all active students enrolled in the course
             %   students = getStudents(obj) fetches active enrolled students in the current course.
             %
@@ -153,7 +151,7 @@ classdef Canvas
 
             url = obj.buildURL(endpoint, qry);
 
-            students = getPayload(obj, url);
+            [students, status, resp] = getPayload(obj, url);
 
             % Modify data output by relocating enrollment section (if it is
             % in the response)
@@ -169,7 +167,7 @@ classdef Canvas
         end
 
         % Assignments and Weighting
-        function asmt_grps = getAssignmentGroups(obj)
+        function [asmt_grps, status, resp] = getAssignmentGroups(obj)
             %getAssignmentGroups Retrieve all assignments groups in the current Canvas course
             %   asmt_grps = getAssignmentGroups(obj) returns a struct array
             %   of assignment groups available in the configured course.
@@ -180,11 +178,10 @@ classdef Canvas
                 {'per_page',    obj.perPage, ...
                 'include[]',   'assignments'});
 
-            asmt_grps = getPayload(obj, url);
+            [asmt_grps, status, resp] = getPayload(obj, url);
 
             % Force "assignments" to be structs
             asmt_grps = forceStruct(asmt_grps, "assignments");
-
             asmt_grps = Chars2StringsRec(asmt_grps);
 
             % Add field for percentage of final grade
@@ -194,7 +191,7 @@ classdef Canvas
                     asmt_grps(n).group_weight ./ totalWeight;
             end
         end
-        function asmts = getAssignments(obj)
+        function [asmts, status, resp] = getAssignments(obj)
             %GETASSIGNMENTS Retrieve all assignments in the current Canvas course
             %   asmts = getAssignments(obj) returns a struct array of assignments
             %   available in the configured course.
@@ -202,10 +199,10 @@ classdef Canvas
             endpoint = "assignments";
             url = buildURL(obj, endpoint, {'per_page', obj.perPage});
 
-            asmts = getPayload(obj, url);
+            [asmts, status, resp] = getPayload(obj, url);
             asmts = Chars2StringsRec(asmts);
         end
-        function asmt = getAssignment(obj, assignmentID)
+        function [asmt, status, resp] = getAssignment(obj, assignmentID)
             %getAssignment Retrieve a specific assignment in the current Canvas course
             %   asmt = getAssignment(obj, asmtID) returns a struct array of
             %   an assignment
@@ -217,12 +214,12 @@ classdef Canvas
             endpoint = "assignments/" + assignmentID;
             url = buildURL(obj, endpoint);
 
-            asmt = getPayload(obj, url);
+            [asmt, status, resp] = getPayload(obj, url);
             asmt = Chars2StringsRec(asmt);
         end
         
         % Submissions
-        function subs = getSubmissions(obj, assignmentID)
+        function [subs, status, resp] = getSubmissions(obj, assignmentID)
             %getSubmissions Retrieve all submission metadata for specific assignment
             %   subs = getSubmissions(obj, asmtID) returns a struct array of
             %   all submissions
@@ -236,24 +233,74 @@ classdef Canvas
                 'include[]', 'submission_comments',...
                 'include[]', 'submission_history'});
 
-            subs = getPayload(obj, url);
+            [subs, status, resp] = getPayload(obj, url);
             subs = Chars2StringsRec(subs);
+        end
+        function [success, msg] = sendGrade(obj, assignmentID, studentID, opts)
+            %%SENDGRADE Sends instructor feedback and grade to a student's submission.
+            %   Can also send additional information with the grade posting
+            %   such as comments or files. 
+            %   Optional Arguments:
+            %   Grade - A grade to be given for the submission. Can be a
+            %   decimal number (for raw score), 
+            %   
+            arguments
+                obj (1,1) Canvas
+                assignmentID (1,1) string
+                studentID (1,1) string
+                opts.Grade (1,1) string = []
+                opts.Comment (1,1) string = []
+                opts.FileNames (:,1) string = []
+            end
+
+            endpoint = "assignments/" + assignmentID + "/submissions/" + studentID;
+            url = buildURL(obj, endpoint);
+
+            % Form data structure
+            bodyStruct = struct();
+
+            % Append new grade
+            if ~isempty(opts.Grade)
+                bodyStruct.submission = struct('posted_grade', opts.Grade);
+            end
+
+            % Append comment
+            if ~isempty(opts.Comment)
+                bodyStruct.comment = struct('text_comment', opts.Comment);
+            end
+
+            % Append files
+            if ~isempty(opts.FileNames)
+                % TODO
+                fileEndpoint = "assignments/" + assignmentID + ...
+                    "/submissions/" + studentID + "/comments/files";
+                for fileName = opts.FileNames
+                    
+                end
+            end
+
+            % send PUT request
+            resp = putPayload(obj, url, bodyStruct);
+
+            success = [];
+            msg = resp;
+
         end
         
         % Files and Folders
-        function quota = getQuota(obj)
+        function [quota, status, resp] = getQuota(obj)
             
             endpoint = "files/quota";
             url = buildURL(obj, endpoint);
 
-            quota = getPayload(obj, url);
+            [quota, status, resp] = getPayload(obj, url);
             quota = Chars2StringsRec(quota);
 
             quota.quota_remaining = quota.quota - quota.quota_used;
             quota.quota_used_percent = quota.quota_used / quota.quota;
             quota.quota_remaining_percent = 1 - quota.quota_used_percent;
         end
-        function files = getFiles(obj, opts)
+        function [files, status, resp] = getFiles(obj, opts)
             %getFiles Retrieve metadata of all files on canvas.
             %   Optional Parameters:
             %   IncludeTypes - a string array of file types to filter for.
@@ -289,10 +336,10 @@ classdef Canvas
                 url = appendQuery(url, {'search_term', opts.Search});
             end
 
-            files = getPayload(obj, url);
+            [files, status, resp] = getPayload(obj, url);
             files = Chars2StringsRec(files);
         end
-        function file = getFile(obj, fileID)
+        function [file, status, resp] = getFile(obj, fileID)
             %GETFILE Retrieve metadata of a folder
             arguments
                 obj (1,1) Canvas
@@ -302,10 +349,10 @@ classdef Canvas
             endpoint = "files/" + fileID;
             url = buildURL(obj, endpoint);
 
-            file = getPayload(obj, url);
+            [file, status, resp] = getPayload(obj, url);
             file = Chars2StringsRec(file);
         end
-        function folders = getFolders(obj)
+        function [folders, status, resp] = getFolders(obj)
             %getFiles Retrieve metadata of all folders on canvas.
             arguments
                 obj (1,1) Canvas
@@ -315,14 +362,14 @@ classdef Canvas
             url = buildURL(obj, endpoint, ...
                 {'per_page', obj.perPage});
 
-            folders = getPayload(obj, url);
+            [folders, status, resp] = getPayload(obj, url);
             folders = Chars2StringsRec(folders);
 
             % Sort folder tree
             [~,index] = sortrows([folders.full_name].');
             folders = folders(index);
         end
-        function folder = getFolder(obj, folderID)
+        function [folder, status, resp] = getFolder(obj, folderID)
             %GETFOLDER Retrieve metadata of a folder
             arguments
                 obj (1,1) Canvas
@@ -332,12 +379,106 @@ classdef Canvas
             endpoint = "folders/" + folderID;
             url = buildURL(obj, endpoint);
 
-            folder = getPayload(obj, url);
+            [folder, status, resp] = getPayload(obj, url);
             folder = Chars2StringsRec(folder);
+        end
+        function [file, status, resp] = uploadFile(obj, endpoint, fullFileName)
+            %UPLOADFILE Uploads a file to Canvas and returns the file's ID.
+            %   The endpoint controls the file's access permissions.
+            %   Uploading to the course's files just places is at a generic
+            %   file. You can also use the submissions endpoint for student
+            %   feedback or submission files.
+
+            arguments
+                obj (1,1) Canvas
+                endpoint (1,1) string
+                fullFileName (1,1) string
+            end
+
+            % Get information about the file the user wants to upload
+            fileInfo = dir(fullFileName);
+            if isempty(fileInfo)
+                error("No such file or directory for\n%s", fullFileName)
+            end
+            fileName = fileInfo.name;
+            fileSize = fileInfo.bytes;
+
+            % Step 1: Instruct Canvas to make a file object
+            % This requires a POST request with multipart/form-data.
+            url = buildURL(obj, endpoint);
+
+            form = matlab.net.http.io.FormProvider(...
+                'name', fileName, ...
+                'size', num2str(fileSize));
+            
+            [uploadData, status] = postPayload(obj, url, form);
+
+            % Only send auth header.
+            % authheader = matlab.net.http.HeaderField(...
+            %     'Authorization', ['Bearer ' char(obj.token)]);
+            % 
+            % % Send the request
+            % req = matlab.net.http.RequestMessage('post', authheader, form);
+            % resp = req.send(url);
+
+            if status.StatusCode ~= matlab.net.http.StatusCode.OK
+                error("Failed to request file upload: %s", char(status.StatusLine.ReasonPhrase))
+            end
+
+            % Parse the response
+            uploadURL = uploadData.upload_url;
+            uploadParams = uploadData.upload_params;
+
+            % Step 2: Upload the File
+            % Send a form with all returned args from first request, then
+            % add the file provider.
+            multipart = {};
+            % Add the form fields from Canvas
+            fields = fieldnames(uploadParams);
+            for i = 1:numel(fields)
+                multipart = [multipart, fields(i), {uploadParams.(fields{i})}];
+            end
+            % Add the actual file to the multipart
+            multipart = [multipart, {'file'}, {matlab.net.http.io.FileProvider(fullFileName)}];
+
+            uploadForm = matlab.net.http.io.MultipartFormProvider(multipart{:});
+
+            % Send the request to the upload URL (no auth header needed)
+            [file, status, resp] = postPayload(obj, uploadURL, uploadForm, Header=[]);
+            
+            % Send the request to the upload URL (no auth header needed)
+            % uploadReq = matlab.net.http.RequestMessage('post', [], uploadForm);
+            % uploadResp = uploadReq.send(uploadURL);
+
+            % Check if good upload:
+            % Get "location" from response
+            % if 3XX, perform a GET to the same location to complete the
+            % upload.
+            if status.StatusCode == matlab.net.http.StatusCode.Created
+                % testURL = matlab.net.URI(uploadResp.location);
+                % testReq = matlab.net.http.RequestMessage('GET', obj.headers);
+                % testresp = testReq.send(testURL);
+            else
+                error("A non 201 code was returned in the response. Incomplete implementation.")
+
+            end
+
+        end
+        function [file, status, resp] = deleteFile(obj, fileID)
+
+            arguments
+                obj (1,1) Canvas
+                fileID (1,1) string
+            end
+
+            endpoint = "files/" + fileID;
+            url = buildURL(obj, endpoint, [], UseCourse=false);
+
+            [file, status, resp] = deleteObject(obj, url);
         end
 
         % Modules
-        function modules = getModules(obj, opts)
+        function [modules, status, resp] = getModules(obj, opts)
             
             arguments
                 obj (1,1) Canvas
@@ -355,11 +496,11 @@ classdef Canvas
                 url = appendQuery(url, {'search_term', opts.Search});
             end
 
-            modules = getPayload(obj, url);
+            [modules, status, resp] = getPayload(obj, url);
             modules = forceStruct(modules, "items");
             modules = Chars2StringsRec(modules);
         end
-        function module = getModule(obj, moduleID)
+        function [module, status, resp] = getModule(obj, moduleID)
             
             arguments
                 obj (1,1) Canvas
@@ -371,10 +512,106 @@ classdef Canvas
                 {"include[]", "items",...
                 "include[]", "content_details"});
 
-            module = getPayload(obj, url);
+            [module, status, resp] = getPayload(obj, url);
             module = forceStruct(module, "items");
             module = Chars2StringsRec(module);
         end
+        function [module, status, resp] = createModule(obj, name, opts)
+            % 
+            % Default position is at the end.
+            % UnlockAt should be a datetime object in local time
+
+            arguments
+                obj (1,1) Canvas
+                name (1,1) string
+                opts.UnlockAt datetime = NaT
+                opts.Position uint16 {mustBeInteger,mustBeGreaterThan(opts.Position, 0)} = []
+            end
+
+            endpoint = "modules";
+            url = buildURL(obj, endpoint);
+
+            formArgs = {"module[name]", name};
+
+            if ~isempty(opts.Position)
+                formArgs = [formArgs, {"module[position]", opts.Position}];
+            end
+
+            if ~isnat(opts.UnlockAt)
+                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
+            end
+
+            form = matlab.net.http.io.FormProvider(formArgs{:});
+
+            [module, status, resp] = postPayload(obj, url, form);
+        end
+        function [module, status, resp] = updateModule(obj, moduleID, opts)
+            arguments
+                obj (1,1) Canvas
+                moduleID (1,1) string
+                opts.Name string = []
+                opts.UnlockAt datetime = NaT
+                opts.Position uint16 {mustBeInteger,mustBeGreaterThan(opts.Position, 0)} = []
+                opts.Publish logical = []
+            end
+
+            endpoint = "modules/" + moduleID;
+            url = buildURL(obj, endpoint);
+
+            formArgs = [];
+            
+            if ~isempty(opts.Name)
+                formArgs = [formArgs, {"module[name]", opts.Name}];
+            end
+
+            if ~isempty(opts.Position)
+                formArgs = [formArgs, {"module[position]", opts.Position}];
+            end
+
+            if ~isnat(opts.UnlockAt)
+                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
+            end
+
+            if ~isempty(opts.Publish)
+                formArgs = [formArgs, {"module[published]", opts.Publish}];
+            end
+
+            if isempty(formArgs)
+                warning("No form entries")
+                module = [];
+                status = [];
+                return
+            end
+
+            form = matlab.net.http.io.FormProvider(formArgs{:});
+
+            [module, status, resp] = putPayload(obj, url, form);
+        end
+        function [module, status, resp] = deleteModule(obj, moduleID)
+            
+            arguments
+                obj (1,1) Canvas
+                moduleID (1,1) string
+            end
+
+            endpoint = "modules/" + moduleID;
+            url = buildURL(obj, endpoint);
+
+            [module, status, resp] = deleteObject(obj, url);
+
+        end
+        function [module, status, resp] = createModuleItem(obj, moduleID, itemType)
+            arguments
+                obj (1,1) Canvas
+                moduleID (1,1) string
+                itemType (1,1) string {mustBeMember(itemType,...
+                    ["File", "Page", "Discussion", "Assignment", "Quiz", ...
+                    "SubHeader", "ExternalUrl", "ExternalTool"])}
+            end
+
+            
+        end
+    
 
         % Downloads
         function downloadSubmissions(obj, assignmentID, downloadsPath, opts)
@@ -496,255 +733,6 @@ classdef Canvas
             end
         end
 
-    end
-
-
-    %% HTTP PUT/POST Methods
-    % These methods send data to Canvas. Use with caution!
-    methods
-        function [success, msg] = sendGrade(obj, assignmentID, studentID, opts)
-            %%SENDGRADE Sends instructor feedback and grade to a student's submission.
-            %   Can also send additional information with the grade posting
-            %   such as comments or files. 
-            %   Optional Arguments:
-            %   Grade - A grade to be given for the submission. Can be a
-            %   decimal number (for raw score), 
-            %   
-            arguments
-                obj (1,1) Canvas
-                assignmentID (1,1) string
-                studentID (1,1) string
-                opts.Grade (1,1) string = []
-                opts.Comment (1,1) string = []
-                opts.FileNames (:,1) string = []
-            end
-
-            endpoint = "assignments/" + assignmentID + "/submissions/" + studentID;
-            url = buildURL(obj, endpoint);
-
-            % Form data structure
-            bodyStruct = struct();
-
-            % Append new grade
-            if ~isempty(opts.Grade)
-                bodyStruct.submission = struct('posted_grade', opts.Grade);
-            end
-
-            % Append comment
-            if ~isempty(opts.Comment)
-                bodyStruct.comment = struct('text_comment', opts.Comment);
-            end
-
-            % Append files
-            if ~isempty(opts.FileNames)
-                % TODO
-                fileEndpoint = "assignments/" + assignmentID + ...
-                    "/submissions/" + studentID + "/comments/files";
-                for fileName = opts.FileNames
-                    
-                end
-            end
-
-            % send PUT request
-            resp = putPayload(obj, url, bodyStruct);
-
-            success = [];
-            msg = resp;
-
-        end
-        
-        % Files
-        function [file, status, resp] = uploadFile(obj, endpoint, fullFileName)
-            %UPLOADFILE Uploads a file to Canvas and returns the file's ID.
-            %   The endpoint controls the file's access permissions.
-            %   Uploading to the course's files just places is at a generic
-            %   file. You can also use the submissions endpoint for student
-            %   feedback or submission files.
-
-            arguments
-                obj (1,1) Canvas
-                endpoint (1,1) string
-                fullFileName (1,1) string
-            end
-
-            % Get information about the file the user wants to upload
-            fileInfo = dir(fullFileName);
-            if isempty(fileInfo)
-                error("No such file or directory for\n%s", fullFileName)
-            end
-            fileName = fileInfo.name;
-            fileSize = fileInfo.bytes;
-
-            % Step 1: Instruct Canvas to make a file object
-            % This requires a POST request with multipart/form-data.
-            url = buildURL(obj, endpoint);
-
-            form = matlab.net.http.io.FormProvider(...
-                'name', fileName, ...
-                'size', num2str(fileSize));
-            
-            [uploadData, status] = postPayload(obj, url, form);
-
-            % Only send auth header.
-            % authheader = matlab.net.http.HeaderField(...
-            %     'Authorization', ['Bearer ' char(obj.token)]);
-            % 
-            % % Send the request
-            % req = matlab.net.http.RequestMessage('post', authheader, form);
-            % resp = req.send(url);
-
-            if status.StatusCode ~= matlab.net.http.StatusCode.OK
-                error("Failed to request file upload: %s", char(status.StatusLine.ReasonPhrase))
-            end
-
-            % Parse the response
-            uploadURL = uploadData.upload_url;
-            uploadParams = uploadData.upload_params;
-
-            % Step 2: Upload the File
-            % Send a form with all returned args from first request, then
-            % add the file provider.
-            multipart = {};
-            % Add the form fields from Canvas
-            fields = fieldnames(uploadParams);
-            for i = 1:numel(fields)
-                multipart = [multipart, fields(i), {uploadParams.(fields{i})}];
-            end
-            % Add the actual file to the multipart
-            multipart = [multipart, {'file'}, {matlab.net.http.io.FileProvider(fullFileName)}];
-
-            uploadForm = matlab.net.http.io.MultipartFormProvider(multipart{:});
-
-            % Send the request to the upload URL (no auth header needed)
-            [file, status, resp] = postPayload(obj, uploadURL, uploadForm, Header=[]);
-            
-            % Send the request to the upload URL (no auth header needed)
-            % uploadReq = matlab.net.http.RequestMessage('post', [], uploadForm);
-            % uploadResp = uploadReq.send(uploadURL);
-
-            % Check if good upload:
-            % Get "location" from response
-            % if 3XX, perform a GET to the same location to complete the
-            % upload.
-            if status.StatusCode == matlab.net.http.StatusCode.Created
-                % testURL = matlab.net.URI(uploadResp.location);
-                % testReq = matlab.net.http.RequestMessage('GET', obj.headers);
-                % testresp = testReq.send(testURL);
-            else
-                error("A non 201 code was returned in the response. Incomplete implementation.")
-
-            end
-
-        end
-        function [file, status, resp] = deleteFile(obj, fileID)
-
-            arguments
-                obj (1,1) Canvas
-                fileID (1,1) string
-            end
-
-            endpoint = "files/" + fileID;
-            url = buildURL(obj, endpoint, [], UseCourse=false);
-
-            [file, status, resp] = deleteObject(obj, url);
-        end
-
-        % Modules
-        function [module, status] = createModule(obj, name, opts)
-            % 
-            % Default position is at the end.
-            % UnlockAt should be a datetime object in local time
-
-            arguments
-                obj (1,1) Canvas
-                name (1,1) string
-                opts.UnlockAt datetime = NaT
-                opts.Position uint16 {mustBeInteger,mustBeGreaterThan(opts.Position, 0)} = []
-            end
-
-            endpoint = "modules";
-            url = buildURL(obj, endpoint);
-
-            formArgs = {"module[name]", name};
-
-            if ~isempty(opts.Position)
-                formArgs = [formArgs, {"module[position]", opts.Position}];
-            end
-
-            if ~isnat(opts.UnlockAt)
-                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
-            end
-
-            form = matlab.net.http.io.FormProvider(formArgs{:});
-
-            [module, status] = postPayload(obj, url, form);
-        end
-        function [module, status] = updateModule(obj, moduleID, opts)
-            arguments
-                obj (1,1) Canvas
-                moduleID (1,1) string
-                opts.Name string = []
-                opts.UnlockAt datetime = NaT
-                opts.Position uint16 {mustBeInteger,mustBeGreaterThan(opts.Position, 0)} = []
-                opts.Publish logical = []
-            end
-
-            endpoint = "modules/" + moduleID;
-            url = buildURL(obj, endpoint);
-
-            formArgs = [];
-            
-            if ~isempty(opts.Name)
-                formArgs = [formArgs, {"module[name]", opts.Name}];
-            end
-
-            if ~isempty(opts.Position)
-                formArgs = [formArgs, {"module[position]", opts.Position}];
-            end
-
-            if ~isnat(opts.UnlockAt)
-                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
-            end
-
-            if ~isempty(opts.Publish)
-                formArgs = [formArgs, {"module[published]", opts.Publish}];
-            end
-
-            if isempty(formArgs)
-                warning("No form entries")
-                module = [];
-                status = [];
-                return
-            end
-
-            form = matlab.net.http.io.FormProvider(formArgs{:});
-
-            [module, status] = putPayload(obj, url, form);
-        end
-        function [module, status] = deleteModule(obj, moduleID)
-            
-            arguments
-                obj (1,1) Canvas
-                moduleID (1,1) string
-            end
-
-            endpoint = "modules/" + moduleID;
-            url = buildURL(obj, endpoint);
-
-            [module, status] = deleteObject(obj, url);
-
-        end
-        function [module, status] = createModuleItem(obj, moduleID, itemType)
-            arguments
-                obj (1,1) Canvas
-                moduleID (1,1) string
-                itemType (1,1) string {mustBeMember(itemType,...
-                    ["File", "Page", "Discussion", "Assignment", "Quiz", ...
-                    "SubHeader", "ExternalUrl", "ExternalTool"])}
-            end
-
-            
-        end
     end
 
     %% Private
@@ -900,6 +888,10 @@ classdef Canvas
         end
         function [data, status, resp] = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
+            %   If pagination is required, data contains all collected
+            %   data.
+            %   status and resp are from the most recent page response
+
             arguments
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
