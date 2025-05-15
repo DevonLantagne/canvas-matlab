@@ -647,7 +647,7 @@ classdef Canvas
             end
 
             if ~isnat(opts.UnlockAt)
-                formArgs = [formArgs, {"module[unlock_at]", local2UTCchar(opts.UnlockAt)}];
+                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
             end
 
             form = matlab.net.http.io.FormProvider(formArgs{:});
@@ -678,7 +678,7 @@ classdef Canvas
             end
 
             if ~isnat(opts.UnlockAt)
-                formArgs = [formArgs, {"module[unlock_at]", local2UTCchar(opts.UnlockAt)}];
+                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
             end
 
             if ~isempty(opts.Publish)
@@ -922,9 +922,20 @@ end
 % These functions are encapsulated inside this .m file and cannot be
 % accessed outside the class.
 
-function timechar = local2UTCchar(localDT)
-localDT.TimeZone = 'UTC';
-timechar = char(localDT, 'yyyy-MM-dd''T''HH:mm:ss''Z''');
+function timechar = local2ISOchar(localDT)
+if ~isa(localDT, 'datetime')
+    error('Input must be a datetime object');
+end
+% If datetime has no timezone, assume system local timezone
+if isempty(localDT.TimeZone)
+    localDT.TimeZone = 'local';
+end
+% Format with ISO 8601 and timezone offset (±hh:mm)
+localDT.Format = 'yyyy-MM-dd''T''HH:mm:ssXXX';
+timechar = char(localDT);
+
+%localDT.TimeZone = 'UTC';
+%timechar = char(localDT, 'yyyy-MM-dd''T''HH:mm:ss''Z''');
 end
 
 function url = appendQuery(url, queries)
