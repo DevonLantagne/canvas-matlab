@@ -775,7 +775,7 @@ classdef Canvas
             end
         end
 
-        function [respData, status] = deleteObject(obj, url)
+        function [respData, status, resp] = deleteObject(obj, url)
             
             arguments
                 obj (1,1) Canvas
@@ -804,7 +804,7 @@ classdef Canvas
             status = resp.StatusLine;
 
         end
-        function [respData, status] = putPayload(obj, url, form, opts)
+        function [respData, status, resp] = putPayload(obj, url, form, opts)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
             %   HTTP PUT is mainly used to modify existing data on Canvas.
             arguments
@@ -816,6 +816,8 @@ classdef Canvas
                     matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
                     ];
             end
+
+            obj.printdb(sprintf("PUT: %s", url.EncodedURI))
             
             req = matlab.net.http.RequestMessage('put', opts.Header, form);
             resp = req.send(url);
@@ -833,9 +835,9 @@ classdef Canvas
 
             status = resp.StatusLine;
         end
-        function [respData, status] = postPayload(obj, url, form, opts)
+        function [respData, status, resp] = postPayload(obj, url, form, opts)
             %POSTPAYLOAD Performs a POST request and returns status of response.
-            %   HTTP Post is mainly used to create data on Canvas
+            %   HTTP POST is mainly used to create data on Canvas
             arguments
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
@@ -845,6 +847,8 @@ classdef Canvas
                     matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
                     ];
             end
+
+            obj.printdb(sprintf("POST: %s", url.EncodedURI))
             
             req = matlab.net.http.RequestMessage('post', opts.Header, form);
             resp = req.send(url);
@@ -863,7 +867,7 @@ classdef Canvas
 
             status = resp.StatusLine;
         end
-        function data = getPayload(obj, url)
+        function [data, status, resp] = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
             arguments
                 obj (1,1) Canvas
@@ -879,6 +883,7 @@ classdef Canvas
             while true
 
                 resp = req.send(url);
+                status = resp.StatusLine;
 
                 if resp.StatusCode ~= matlab.net.http.StatusCode.OK
                     error('Failed to fetch data: %s', char(resp.StatusLine.ReasonPhrase));
