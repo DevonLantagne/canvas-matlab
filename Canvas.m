@@ -704,6 +704,17 @@ classdef Canvas
             [module, status] = deleteObject(obj, url);
 
         end
+        function [module, status] = createModuleItem(obj, moduleID, itemType)
+            arguments
+                obj (1,1) Canvas
+                moduleID (1,1) string
+                itemType (1,1) string {mustBeMember(itemType,...
+                    ["File", "Page", "Discussion", "Assignment", "Quiz", ...
+                    "SubHeader", "ExternalUrl", "ExternalTool"])}
+            end
+
+            
+        end
     end
 
     %% Private
