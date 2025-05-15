@@ -641,15 +641,56 @@ classdef Canvas
                 formArgs = [formArgs, {"module[position]", opts.Position}];
             end
 
-            if isnat(opts.UnlockAt)
+            if ~isnat(opts.UnlockAt)
                 formArgs = [formArgs, {"module[unlock_at]", local2UTCchar(opts.UnlockAt)}];
+            end
+
+            form = matlab.net.http.io.FormProvider(formArgs{:});
+
+            [module, status] = postPayload(obj, url, form);
+        end
+        function [module, status] = updateModule(obj, moduleID, opts)
+            arguments
+                obj (1,1) Canvas
+                moduleID (1,1) string
+                opts.Name string = []
+                opts.UnlockAt datetime = NaT
+                opts.Position uint16 {mustBeInteger,mustBeGreaterThan(opts.Position, 0)} = []
+                opts.Publish logical = []
+            end
+
+            endpoint = "modules/" + moduleID;
+            url = buildURL(obj, endpoint);
+
+            formArgs = [];
+            
+            if ~isempty(opts.Name)
+                formArgs = [formArgs, {"module[name]", opts.Name}];
+            end
+
+            if ~isempty(opts.Position)
+                formArgs = [formArgs, {"module[position]", opts.Position}];
+            end
+
+            if ~isnat(opts.UnlockAt)
+                formArgs = [formArgs, {"module[unlock_at]", local2UTCchar(opts.UnlockAt)}];
+            end
+
+            if ~isempty(opts.Publish)
+                formArgs = [formArgs, {"module[published]", opts.Publish}];
+            end
+
+            if isempty(formArgs)
+                warning("No form entries")
+                module = [];
+                status = [];
+                return
             end
 
             form = matlab.net.http.io.FormProvider(formArgs{:});
 
             [module, status] = putPayload(obj, url, form);
         end
-        
     end
 
     %% Private
@@ -690,6 +731,33 @@ classdef Canvas
 
         function [respData, status] = putPayload(obj, url, form)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
+            arguments
+                obj (1,1) Canvas
+                url (1,1) matlab.net.URI
+                form
+            end
+
+            postheaders = [
+                matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
+                matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
+                ];
+            
+            req = matlab.net.http.RequestMessage('put', postheaders, form);
+            resp = req.send(url);
+
+            if resp.StatusCode == matlab.net.http.StatusCode.OK
+                respData = resp.Body.Data;
+                if resp.Body.ContentType.Subtype == "json"
+                    respData = Chars2StringsRec(respData);
+                end
+            else
+                respData = [];
+            end
+
+            status = resp.StatusLine;
+        end
+        function [respData, status] = postPayload(obj, url, form)
+            %POSTPAYLOAD Performs a POST request and returns status of response.
             arguments
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
