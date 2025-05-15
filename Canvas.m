@@ -46,8 +46,14 @@ classdef Canvas
         %TOKEN Bearer token used for authentication
         token (1,1) string
 
-        %HEADERS Precomputed HTTP headers used in each request
-        headers
+        authHeader
+    end
+
+    properties (Constant, Hidden)
+        jsonHeader = matlab.net.http.HeaderField(...
+            'Accept', 'application/json')
+        formHeader = matlab.net.http.field.ContentTypeField(...
+            'application/x-www-form-urlencoded')
     end
 
 
@@ -74,14 +80,13 @@ classdef Canvas
 
             obj.debug = opts.debug;
 
-            obj.headers = [
-                matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
-                matlab.net.http.HeaderField('Accept', 'application/json')
-                ];
+            obj.authHeader = matlab.net.http.HeaderField(...
+                'Authorization', ['Bearer ' char(obj.token)]);
 
             url = buildURL(obj); % Build default course URL
 
-            request = matlab.net.http.RequestMessage('GET', obj.headers);
+            request = matlab.net.http.RequestMessage('GET', ...
+                [obj.authHeader, obj.jsonHeader]);
 
             try
                 response = request.send(url);
@@ -467,14 +472,6 @@ classdef Canvas
             
             [uploadData, status] = postPayload(obj, url, form);
 
-            % Only send auth header.
-            % authheader = matlab.net.http.HeaderField(...
-            %     'Authorization', ['Bearer ' char(obj.token)]);
-            % 
-            % % Send the request
-            % req = matlab.net.http.RequestMessage('post', authheader, form);
-            % resp = req.send(url);
-
             if status.StatusCode ~= matlab.net.http.StatusCode.OK
                 error("Failed to request file upload: %s", char(status.StatusLine.ReasonPhrase))
             end
@@ -813,6 +810,7 @@ classdef Canvas
                 double(resp.getFields("x-request-cost").Value), ...
                 double(resp.getFields("x-rate-limit-remaining").Value)))
         end
+        
         function url = buildURL(obj, endpoint, queries, opts)
             %BUILDURL Construct a full API URL from the endpoint and arguments
             %   url = buildURL(obj, endpoint) returns the full URL to use
@@ -855,27 +853,23 @@ classdef Canvas
                 url (1,1) matlab.net.URI
             end
 
-            authheader = matlab.net.http.HeaderField(...
-                'Authorization', ['Bearer ' char(obj.token)]);
+            respData = [];
 
-            req = matlab.net.http.RequestMessage('delete', authheader);
+            req = matlab.net.http.RequestMessage('delete', obj.authHeader);
             resp = req.send(url);
 
-            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
-                error('Failed to delete data object: %s', char(resp.StatusLine.ReasonPhrase));
+            status = resp.StatusLine;
+
+            if status.StatusCode ~= matlab.net.http.StatusCode.OK
+                return
             end
 
-            obj.printdb(sprintf("API Limiting:  Cost: %f  |  Remaining: %f",...
-                double(resp.getFields("x-request-cost").Value), ...
-                double(resp.getFields("x-rate-limit-remaining").Value)))
+            obj.printdb_limits(resp)
 
             respData = resp.Body.Data;
             if resp.Body.ContentType.Subtype == "json"
                 respData = Chars2StringsRec(respData);
             end
-
-            status = resp.StatusLine;
-
         end
         function [respData, status, resp] = putPayload(obj, url, form, opts)
             %PUTPAYLOAD Performs a PUT request and returns status of response.
@@ -884,19 +878,20 @@ classdef Canvas
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
                 form
-                opts.Header = [
-                    matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
-                    matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
-                    ];
+                opts.Header = [obj.authHeader, obj.formHeader];
             end
+
+            respData = [];
 
             obj.printdb(sprintf("PUT: %s", url.EncodedURI))
             
             req = matlab.net.http.RequestMessage('put', opts.Header, form);
             resp = req.send(url);
 
-            if resp.StatusCode ~= matlab.net.http.StatusCode.OK
-                error('Failed to put data: %s', char(resp.StatusLine.ReasonPhrase));
+            status = resp.StatusLine;
+
+            if status.StatusCode ~= matlab.net.http.StatusCode.OK
+                return
             end
 
             obj.printdb_limits(resp)
@@ -906,7 +901,6 @@ classdef Canvas
                 respData = Chars2StringsRec(respData);
             end
 
-            status = resp.StatusLine;
         end
         function [respData, status, resp] = postPayload(obj, url, form, opts)
             %POSTPAYLOAD Performs a POST request and returns status of response.
@@ -915,20 +909,21 @@ classdef Canvas
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
                 form
-                opts.Header = [
-                    matlab.net.http.HeaderField('Authorization', ['Bearer ' char(obj.token)]), ...
-                    matlab.net.http.field.ContentTypeField('application/x-www-form-urlencoded')
-                    ];
+                opts.Header = [obj.authHeader, obj.formHeader];
             end
+
+            respData = [];
 
             obj.printdb(sprintf("POST: %s", url.EncodedURI))
             
             req = matlab.net.http.RequestMessage('post', opts.Header, form);
             resp = req.send(url);
 
-            if ~(resp.StatusCode == matlab.net.http.StatusCode.OK || ...
-                    resp.StatusCode == matlab.net.http.StatusCode.Created)
-                error('Failed to post data: %s', char(resp.StatusLine.ReasonPhrase));
+            status = resp.StatusLine;
+
+            if ~(status.StatusCode == matlab.net.http.StatusCode.OK || ...
+                    status.StatusCode == matlab.net.http.StatusCode.Created)
+                return
             end
 
             obj.printdb_limits(resp)
@@ -938,7 +933,6 @@ classdef Canvas
                 respData = Chars2StringsRec(respData);
             end
 
-            status = resp.StatusLine;
         end
         function [data, status, resp] = getPayload(obj, url)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
@@ -955,7 +949,7 @@ classdef Canvas
 
             obj.printdb(sprintf("GET: %s", url.EncodedURI))
 
-            req = matlab.net.http.RequestMessage('GET', obj.headers);
+            req = matlab.net.http.RequestMessage('GET', [obj.authHeader, obj.jsonHeader]);
 
             while true
 
@@ -963,7 +957,9 @@ classdef Canvas
                 status = resp.StatusLine;
 
                 if resp.StatusCode ~= matlab.net.http.StatusCode.OK
-                    error('Failed to fetch data: %s', char(resp.StatusLine.ReasonPhrase));
+                    % Failed, return empty (or partial), user should check
+                    % status.
+                    return
                 end
 
                 obj.printdb_limits(resp)
