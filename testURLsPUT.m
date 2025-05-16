@@ -42,9 +42,11 @@ else
 end
 
 %% Test Create Module
-% This test creates a module and items, waits for user input (to check
-% Canvas), and then deletes the module. The unlock time will be 1 hour from
+% This test creates a module and items. The unlock time will be 1 hour from
 % time of execution.
+%
+% Use the Delete Module test to remove all created assets
+
 fprintf("--- Starting Creation/Delete Module Test ---\n")
 
 fprintf("Creating module...\n")
@@ -56,10 +58,18 @@ NewModuleItem = canv.createModuleItem(NewModule.id, "SubHeader", ...
     Title="Test Subheader", Publish=true);
 fprintf("Module item created. Check Canvas.\n")
 
-input("Press ENTER to continue");
+%% Test Delete Module
+% This test delets a module and items from the Create Module test. 
 
-DeletedModule = canv.deleteModule(NewModule.id);
-fprintf("Module deleted. Check Canvas.\n")
+% Search for created module
+createdMod = canv.getModules(Search="Test Module 01");
+if isempty(createdMod)
+    fprintf("Module not found.\n")
+else
+    fprintf("Module found.\nDeleting module...\n")
+    DeletedModule = canv.deleteModule(NewModule.id);
+    fprintf("Module deleted.\n")
+end
 
 
 

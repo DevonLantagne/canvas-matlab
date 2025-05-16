@@ -544,52 +544,37 @@ classdef Canvas
             arguments
                 obj (1,1) Canvas
                 name (1,1) string
-                opts.ParentID (1,1) string = ""
-                opts.ParentPath (1,1) string = ""
-                opts.UnlockAt (1,1) datetime = NaT
-                opts.LockAt (1,1) datetime = NaT
+                opts.ParentID string = []
+                opts.ParentPath string = []
+                opts.UnlockAt datetime = []
+                opts.LockAt datetime = []
                 opts.Locked logical = []
                 opts.Hidden logical = []
-                opts.Position = []
+                opts.Position uint16 = []
             end
 
             endpoint = "folders";
             url = buildURL(obj, endpoint);
 
-            formArgs = {"name", name};
-
             % Guard
-            if opts.ParentID ~= "" && opts.ParentPath ~= ""
+            if ~isempty(opts.ParentID) && ~isempty(opts.ParentPath)
                 error("ParentID and ParentPath are mutually exclusive.")
             end
 
-            if opts.ParentID ~= ""
-                formArgs = [formArgs, {"parent_folder_id", opts.ParentID}];
-            end
-            if opts.ParentPath ~= ""
-                formArgs = [formArgs, {"parent_folder_path", opts.ParentPath}];
-            end
+            RequiredArgs = {"name", name};
 
-            if ~isnat(opts.UnlockAt)
-                formArgs = [formArgs, {"unlock_at", local2ISOchar(opts.UnlockAt)}];
-            end
-            if ~isnat(opts.LockAt)
-                formArgs = [formArgs, {"unlock_at", local2ISOchar(opts.LockAt)}];
-            end
-            if ~isempty(opts.Locked)
-                formArgs = [formArgs, {"locked", string(opts.Locked)}];
-            end
-
-            if ~isempty(opts.Hidden)
-                formArgs = [formArgs, {"hidden", string(opts.Hidden)}];
-            end
-
-            if ~isempty(opts.Position)
-                formArgs = [formArgs, {"position", opts.Position}];
-            end
-
-            form = matlab.net.http.io.FormProvider(formArgs{:});
-
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "ParentID",     "parent_folder_id",     "string", ...
+                "ParentPath",   "parent_folder_path",   "path", ...
+                "UnlockAt",     "unlock_at",            "datetime", ...
+                "LockAt",       "lock_at",              "datetime", ...
+                "Locked",       "locked",               "boolean", ...
+                "Hidden",       "hidden",               "boolean", ...
+                "Position",     "position",             "integer");
+            
+            form = buildBody("post", opts, argSet, FirstArgs=RequiredArgs);
+            
             [folder, status, resp] = postPayload(obj, url, form);
 
         end
@@ -605,6 +590,8 @@ classdef Canvas
             %       assignment submission. The use MUST supply the
             %       AssignmentID and the StudentID.
             %       
+
+            % TODO: Split folder and endpoint args, use argSet
 
             arguments
                 obj (1,1) Canvas
@@ -885,31 +872,30 @@ classdef Canvas
                 itemType (1,1) string {mustBeMember(itemType,...
                     ["File", "Page", "Discussion", "Assignment", "Quiz", ...
                     "SubHeader", "ExternalUrl", "ExternalTool"])}
-                opts.Title string = ""
-                opts.ContentID string = ""
+                % Args for API call
+                opts.Title string = []
+                opts.ContentID string = []
                 opts.Position = []
                 opts.Indent = []
-                opts.PageURL string = ""
-                opts.ExternalURL string = ""
+                opts.PageURL string = []
+                opts.ExternalURL string = []
+                % Args for app features
                 opts.Publish (1,1) logical = false
             end
 
             % First check requirements depending on selected itemType
-
             % Required for ContentID
             if ismember(itemType, ["File", "Discussion", "Assignment", "Quiz", "ExternalTool"])
                 if isempty(opts.ContentID)
                     error("ContentID must be defined for itemType=%s", itemType)
                 end
             end
-
             % For Page
             if itemType == "Page"
                 if opts.PageURL == ""
                     error("PageURL must be defined for itemType=%s", itemType)
                 end
             end
-
             % For ExternalURL
             if ismember(itemType, ["ExternalUrl", "ExternalTool"])
                 if opts.ExternalURL == ""
@@ -922,33 +908,18 @@ classdef Canvas
             endpoint = "modules/" + moduleID + "/items";
             url = buildURL(obj, endpoint);
 
-            formArgs = {"module_item[type]", itemType};
+            RequiredArgs = {"module_item[type]", itemType};
 
-            if opts.Title ~= ""
-                formArgs = [formArgs, {"module_item[title]", opts.Title}];
-            end
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "Title",        "module_item[title]",           "string", ...
+                "ContentID",    "module_item[content_id]",      "integer", ...
+                "Position",     "module_item[position]",        "integer", ...
+                "Indent",       "module_item[indent]",          "integer", ...
+                "PageURL",      "module_item[page_url]",        "string", ...
+                "ExternalURL",  "module_item[external_url]",    "string");
 
-            if opts.ContentID ~= ""
-                formArgs = [formArgs, {"module_item[content_id]", opts.ContentID}];
-            end
-
-            if ~isempty(opts.Position)
-                formArgs = [formArgs, {"module_item[position]", string(opts.Position)}];
-            end
-
-            if ~isempty(opts.Indent)
-                formArgs = [formArgs, {"module_item[indent]", string(opts.Indent)}];
-            end
-
-            if opts.PageURL ~= ""
-                formArgs = [formArgs, {"module_item[page_url]", opts.PageURL}];
-            end
-
-            if opts.ExternalURL ~= ""
-                formArgs = [formArgs, {"module_item[external_url]", opts.ExternalURL}];
-            end
-
-            form = matlab.net.http.io.FormProvider(formArgs{:});
+            form = buildBody("post", opts, argSet, FirstArgs=RequiredArgs);
 
             [moduleItem, status, resp] = postPayload(obj, url, form);
 
@@ -964,12 +935,12 @@ classdef Canvas
                 obj (1,1) Canvas
                 moduleID (1,1) string
                 itemID (1,1) string
-                opts.Title string = ""
-                opts.Position = []
-                opts.Indent = []
-                opts.ExternalURL string = ""
+                opts.Title string = []
+                opts.Position uint16 = []
+                opts.Indent uint8 = []
+                opts.ExternalURL string = []
                 opts.Published logical = []
-                opts.NewModuleID string = ""
+                opts.NewModuleID string = []
             end
 
             % Now build the request
@@ -977,33 +948,15 @@ classdef Canvas
             endpoint = "modules/" + moduleID + "/items/" + itemID;
             url = buildURL(obj, endpoint);
 
-            formArgs = {};
-
-            if opts.Title ~= ""
-                formArgs = [formArgs, {"module_item[title]", opts.Title}];
-            end
-
-            if ~isempty(opts.Position)
-                formArgs = [formArgs, {"module_item[position]", string(opts.Position)}];
-            end
-
-            if ~isempty(opts.Indent)
-                formArgs = [formArgs, {"module_item[indent]", string(opts.Indent)}];
-            end
-
-            if opts.ExternalURL ~= ""
-                formArgs = [formArgs, {"module_item[external_url]", opts.ExternalURL}];
-            end
-
-            if ~isempty(opts.Published)
-                formArgs = [formArgs, {"module_item[published]", string(opts.Published)}];
-            end
-
-            if opts.NewModuleID ~= ""
-                formArgs = [formArgs, {"module_item[module_id]", opts.NewModuleID}];
-            end
-
-            form = matlab.net.http.io.FormProvider(formArgs{:});
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "Title",        "module_item[title]",           "string", ...
+                "Position",     "module_item[position]",        "integer", ...
+                "Indent",       "module_item[indent]",          "integer", ...
+                "ExternalURL",  "module_item[external_url]",    "string", ...
+                "Published",    "module_item[published]",       "boolean", ...
+                "NewModuleID",  "module_item[module_id]",       "string");
+            form = buildBody("put", opts, argSet);
 
             [moduleItem, status, resp] = putPayload(obj, url, form);
 
@@ -1080,6 +1033,8 @@ classdef Canvas
 
             respData = [];
 
+            obj.printdb(sprintf("DELETE: %s", url.EncodedURI))
+
             req = matlab.net.http.RequestMessage('delete', obj.authHeader);
             resp = req.send(url);
 
@@ -1109,6 +1064,7 @@ classdef Canvas
             respData = [];
 
             obj.printdb(sprintf("PUT: %s", url.EncodedURI))
+            obj.printdb(sprintf("Form: %s", form.string))
             
             req = matlab.net.http.RequestMessage('put', opts.Header, form);
             resp = req.send(url);
@@ -1140,6 +1096,7 @@ classdef Canvas
             respData = [];
 
             obj.printdb(sprintf("POST: %s", url.EncodedURI))
+            obj.printdb(sprintf("Form: %s", form.string))
             
             req = matlab.net.http.RequestMessage('post', opts.Header, form);
             resp = req.send(url);
@@ -1224,6 +1181,88 @@ end
 %% Helper Functions
 % These functions are encapsulated inside this .m file and cannot be
 % accessed outside the class.
+
+function argSet = buildArgSet(name, key, type)
+arguments (Repeating)
+    name (1,1) string
+    key (1,1) string
+    type (1,1) string {mustBeMember(type, ["string", "integer", "boolean", "datetime", "path"])}
+end
+numArgs = length(name);
+argSet = struct();
+% For each tripplet, build the argSet
+for a = 1:numArgs
+    argSet.(name{a}) = struct(...
+        "type", type{a}, ...
+        "array", endsWith(key{a},"[]"), ...
+        "key", key{a});
+end
+end
+
+function body = buildBody(method, argStruct, argSet, opts)
+% buildBody generates a query array (if method="get") or generates a
+% multipart form (if method="post" or "put").
+%
+% Use buildArgSet to build a structure to help validate optional arugments
+% of the API call.
+
+arguments
+    method (1,1) string {mustBeMember(method, ["get", "put", "post"])}
+    argStruct struct
+    argSet (1,1) struct
+    opts.FirstArgs (1,:) cell = {}
+    opts.LastArgs (1,:) cell = {}
+end
+
+argNames = string(fields(argSet))'; % row vector
+bodyCell = {};
+
+for argName = argNames
+    % get data
+    argValue = argStruct.(argName);
+
+    % guard if no value for this arg
+    if isempty(argValue); continue; end
+
+    % Convert any char arrays into strings to avoid bad array check
+    if ischar(argValue); argValue = string(argValue); end
+
+    % Process scalar or array
+    argInfo = argSet.(argName); % arg type info
+    if ~argInfo.array && (length(argValue) > 1)
+        error("A vector was supplied instead of a scalar for %s", argName)
+    end
+    for a = 1:length(argValue)
+        % Process value based on type (if needed)
+        value = argValue(a);
+        switch argInfo.type
+            case "string"
+                % do nothing
+            case "integer"
+                value = string(value); % converts a floating point to string format
+            case "datetime"
+                value = string(local2ISOchar(localDT));
+            case "boolean"
+                value = string(value);
+            case "path"
+                value = sanitizePath(value);
+        end
+        bodyCell = [bodyCell, {argInfo.key, value}];
+    end
+end
+
+% Append special args
+bodyCell = [opts.FirstArgs, bodyCell, opts.LastArgs];
+
+% Package output
+switch method
+    case "get"
+        body = matlab.net.QueryParameter(bodyCell{:});
+    case {"put", "post"}
+        body = matlab.net.http.io.FormProvider(bodyCell{:});
+end
+
+end
 
 function NewPath = sanitizePath(OldPath)
 % Canvas only uses forward slashes / for filepath values
