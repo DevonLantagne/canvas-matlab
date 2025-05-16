@@ -135,6 +135,8 @@ classdef Canvas
             %               User can supply a cell array of name,values:
             %               st = canv.getStudents(Query={'arg1','val1','arg2','val2'})
 
+            % TODO: revamp optional arguments to be consistent
+
             arguments
                 obj (1,1) Canvas
                 opts.GetAvatar (1,1) logical = false
@@ -271,7 +273,7 @@ classdef Canvas
                 opts.Comment (1,1) string = []
                 opts.FileNames (:,1) string = []
             end
-            error("Not fully implemented")
+            error("Not fully implemented or tested")
 
             submission = [];
             status = [];
@@ -464,35 +466,25 @@ classdef Canvas
             %   Search - a string of a term to search for
             arguments
                 obj (1,1) Canvas
-                opts.IncludeTypes (1,:) string = ""
-                opts.ExcludeTypes (1,:) string = ""
-                opts.Search (1,1) string = ""
+                opts.IncludeTypes (1,:) string = []
+                opts.ExcludeTypes (1,:) string = []
+                opts.Search string = []
             end
 
             endpoint = "files";
-            url = buildURL(obj, endpoint, ...
-                {'per_page', obj.perPage});
 
-            % Check IncludeTypes
-            if opts.IncludeTypes ~= ""
-                for n = 1:length(opts.IncludeTypes)
-                    url = appendQuery(url, {'content_types[]', opts.IncludeTypes(n)});
-                end
-            end
+            ExtraQueries = {'per_page', obj.perPage};
 
-            % Check ExcludeTypes
-            if opts.ExcludeTypes ~= ""
-                for n = 1:length(opts.IncludeTypes)
-                    url = appendQuery(url, {'exclude_content_types[]', opts.ExcludeTypes(n)});
-                end
-            end
+            url = buildURL(obj, endpoint);
 
-            % Check Search
-            if opts.Search ~= ""
-                url = appendQuery(url, {'search_term', opts.Search});
-            end
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "IncludeTypes", "content_types[]",          "string", ...
+                "ExcludeTypes", "exclude_content_types[]",  "string", ...
+                "Search",       "search_term",              "string");
+            queries = buildBody("get", opts, argSet, LastArgs=ExtraQueries);
 
-            [files, status, resp] = getPayload(obj, url);
+            [files, status, resp] = getPayload(obj, url, queries);
             files = Chars2StringsRec(files);
         end
         function [file, status, resp] = getFile(obj, fileID)
@@ -515,8 +507,7 @@ classdef Canvas
             end
 
             endpoint = "folders";
-            url = buildURL(obj, endpoint, ...
-                {'per_page', obj.perPage});
+            url = buildURL(obj, endpoint, {'per_page', obj.perPage});
 
             [folders, status, resp] = getPayload(obj, url);
             if isempty(folders); return; end
@@ -546,8 +537,8 @@ classdef Canvas
                 name (1,1) string
                 opts.ParentID string = []
                 opts.ParentPath string = []
-                opts.UnlockAt datetime = []
-                opts.LockAt datetime = []
+                opts.UnlockAt datetime = NaT
+                opts.LockAt datetime = NaT
                 opts.Locked logical = []
                 opts.Hidden logical = []
                 opts.Position uint16 = []
@@ -595,7 +586,7 @@ classdef Canvas
 
             arguments
                 obj (1,1) Canvas
-                uploadType (1,1) string {mustBeMember(uploadType, "files", "comment")}
+                uploadType (1,1) string {mustBeMember(uploadType, ["files", "comment"])}
                 fullFileName (1,1) string
                 opts.FolderID (1,1) string = ""
                 opts.FolderPath (1,1) string = ""
@@ -698,7 +689,7 @@ classdef Canvas
             end
 
             endpoint = "files/" + fileID;
-            url = buildURL(obj, endpoint, [], UseCourse=false);
+            url = buildURL(obj, endpoint, {}, UseCourse=false);
 
             [file, status, resp] = deleteObject(obj, url);
         end
@@ -711,32 +702,25 @@ classdef Canvas
                 obj (1,1) Canvas
                 opts.Sort string {mustBeMember(opts.Sort, ["title", "created_at", "updated_at"])} = "updated_at"
                 opts.Order (1,1) string {mustBeMember(opts.Order, ["asc", "desc"])} = "asc"
-                opts.Search (1,1) string = ""
+                opts.Search string = []
                 opts.Published logical = []
             end
 
             endpoint = "pages";
-            url = buildURL(obj, endpoint, ...
-                {'per_page', obj.perPage});
+            
+            ExtraQueries = {'per_page', obj.perPage};
 
-            % Check IncludeTypes
-            if opts.Sort ~= ""
-                url = appendQuery(url, {'sort', opts.Sort});
-            end
-            % Check ExcludeTypes
-            if opts.Order ~= ""
-                url = appendQuery(url, {'order', opts.Order});
-            end
-            % Check Search
-            if opts.Search ~= ""
-                url = appendQuery(url, {'search_term', opts.Search});
-            end
-            % Check Search
-            if ~isempty(opts.Published)
-                url = appendQuery(url, {'published', string(opts.Published)});
-            end
+            url = buildURL(obj, endpoint);
 
-            [pages, status, resp] = getPayload(obj, url);
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "Sort", "sort",             "string", ...
+                "Order", "order",           "string", ...
+                "Search", "search_term",    "string", ...
+                "Published", "published",   "boolean");
+            queries = buildBody("get", opts, argSet, LastArgs=ExtraQueries);
+
+            [pages, status, resp] = getPayload(obj, url, queries);
             pages = Chars2StringsRec(pages);
         end
 
@@ -745,21 +729,25 @@ classdef Canvas
             
             arguments
                 obj (1,1) Canvas
-                opts.Search (1,1) string = ""
+                opts.Search string = []
             end
 
             endpoint = "modules";
-            url = buildURL(obj, endpoint,...
-                {"include[]", "items",...
+
+            ExtraQueries = {...
+                "include[]", "items",...
                 "include[]", "content_details",...
-                'per_page', obj.perPage});
+                'per_page', obj.perPage};
 
-            % Check Search
-            if opts.Search ~= ""
-                url = appendQuery(url, {'search_term', opts.Search});
-            end
+            url = buildURL(obj, endpoint);
 
-            [modules, status, resp] = getPayload(obj, url);
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "Search", "search_term",    "string");
+            queries = buildBody("get", opts, argSet, LastArgs=ExtraQueries);
+
+            [modules, status, resp] = getPayload(obj, url, queries);
+
             if isempty(modules); return; end
             modules = forceStruct(modules, "items");
             modules = Chars2StringsRec(modules);
@@ -796,17 +784,14 @@ classdef Canvas
             endpoint = "modules";
             url = buildURL(obj, endpoint);
 
-            formArgs = {"module[name]", name};
+            RequiredArgs = {"module[name]", name};
 
-            if ~isempty(opts.Position)
-                formArgs = [formArgs, {"module[position]", opts.Position}];
-            end
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "UnlockAt",     "module[unlock_at]",       "datetime", ...
+                "Position",     "module[position]",        "integer");
 
-            if ~isnat(opts.UnlockAt)
-                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
-            end
-
-            form = matlab.net.http.io.FormProvider(formArgs{:});
+            form = buildBody("post", opts, argSet, FirstArgs=RequiredArgs);
 
             [module, status, resp] = postPayload(obj, url, form);
         end
@@ -823,32 +808,22 @@ classdef Canvas
             endpoint = "modules/" + moduleID;
             url = buildURL(obj, endpoint);
 
-            formArgs = [];
-            
-            if ~isempty(opts.Name)
-                formArgs = [formArgs, {"module[name]", opts.Name}];
-            end
+            % build the form and validate optional arguments
+            argSet = buildArgSet( ...
+                "Name",        "module[name]",           "string", ...
+                "UnlockAt",    "module[unlock_at]",      "datetime", ...
+                "Position",    "module[position]",       "integer", ...
+                "Publish",     "module[published]",      "boolean");
 
-            if ~isempty(opts.Position)
-                formArgs = [formArgs, {"module[position]", opts.Position}];
-            end
+            form = buildBody("post", opts, argSet);
 
-            if ~isnat(opts.UnlockAt)
-                formArgs = [formArgs, {"module[unlock_at]", local2ISOchar(opts.UnlockAt)}];
-            end
-
-            if ~isempty(opts.Publish)
-                formArgs = [formArgs, {"module[published]", string(opts.Publish)}];
-            end
-
-            if isempty(formArgs)
+            if isempty(form)
                 warning("No form entries")
                 module = [];
                 status = [];
+                resp = [];
                 return
             end
-
-            form = matlab.net.http.io.FormProvider(formArgs{:});
 
             [module, status, resp] = putPayload(obj, url, form);
         end
@@ -875,8 +850,8 @@ classdef Canvas
                 % Args for API call
                 opts.Title string = []
                 opts.ContentID string = []
-                opts.Position = []
-                opts.Indent = []
+                opts.Position uint16 = []
+                opts.Indent uint16 = []
                 opts.PageURL string = []
                 opts.ExternalURL string = []
                 % Args for app features
@@ -943,8 +918,6 @@ classdef Canvas
                 opts.NewModuleID string = []
             end
 
-            % Now build the request
-
             endpoint = "modules/" + moduleID + "/items/" + itemID;
             url = buildURL(obj, endpoint);
 
@@ -958,8 +931,15 @@ classdef Canvas
                 "NewModuleID",  "module_item[module_id]",       "string");
             form = buildBody("put", opts, argSet);
 
-            [moduleItem, status, resp] = putPayload(obj, url, form);
+            if isempty(form)
+                warning("No form entries")
+                moduleItem = [];
+                status = [];
+                resp = [];
+                return
+            end
 
+            [moduleItem, status, resp] = putPayload(obj, url, form);
         end
     
     end
@@ -1020,7 +1000,7 @@ classdef Canvas
 
             % Add query arguments to URL
             if ~isempty(queries)
-                url = appendQuery(url, queries);
+                url.Query = [url.Query, matlab.net.QueryParameter(queries{:})];
             end
         end
 
@@ -1116,7 +1096,7 @@ classdef Canvas
             end
 
         end
-        function [data, status, resp] = getPayload(obj, url)
+        function [respData, status, resp] = getPayload(obj, url, queries)
             %GETPAYLOAD Performs a GET request and returns the data from the response.
             %   If pagination is required, data contains all collected
             %   data.
@@ -1125,9 +1105,14 @@ classdef Canvas
             arguments
                 obj (1,1) Canvas
                 url (1,1) matlab.net.URI
+                queries (1,:) matlab.net.QueryParameter = []
             end
 
-            data = [];
+            respData = [];
+
+            if ~isempty(queries)
+                url.Query = [url.Query, queries];
+            end
 
             obj.printdb(sprintf("GET: %s", url.EncodedURI))
 
@@ -1147,12 +1132,12 @@ classdef Canvas
                 obj.printdb_limits(resp)
 
                 if isstruct(resp.Body.Data)
-                    data = unionStructs(data, resp.Body.Data);
+                    respData = unionStructs(respData, resp.Body.Data);
                 elseif iscell(resp.Body.Data)
                     S = normalizeStruct(resp.Body.Data); % convert cell array of hetero structures
-                    data = unionStructs(data, S); % append to existing assignments
+                    respData = unionStructs(respData, S); % append to existing assignments
                 elseif isempty(resp.Body.Data)
-                    data = [];
+                    respData = [];
                     return
                 else
                     error("Unknown body data type.")
@@ -1224,6 +1209,9 @@ for argName = argNames
     % guard if no value for this arg
     if isempty(argValue); continue; end
 
+    % guard for "empty" datetime
+    if isdatetime(argValue) && isnat(argValue); continue; end
+
     % Convert any char arrays into strings to avoid bad array check
     if ischar(argValue); argValue = string(argValue); end
 
@@ -1241,7 +1229,7 @@ for argName = argNames
             case "integer"
                 value = string(value); % converts a floating point to string format
             case "datetime"
-                value = string(local2ISOchar(localDT));
+                value = string(local2ISOchar(value));
             case "boolean"
                 value = string(value);
             case "path"
@@ -1255,6 +1243,9 @@ end
 bodyCell = [opts.FirstArgs, bodyCell, opts.LastArgs];
 
 % Package output
+if isempty(bodyCell)
+    return
+end
 switch method
     case "get"
         body = matlab.net.QueryParameter(bodyCell{:});

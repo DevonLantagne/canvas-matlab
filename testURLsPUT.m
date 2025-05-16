@@ -10,7 +10,8 @@ canv = Canvas(env.BASE_URL, env.API_KEY, env.COURSE_ID, debug=true)
 fprintf("Canvas API connected!\n")
 
 %% File Upload Test
-% Uploads the testFile.txt to Canvas.
+% Uploads the testFile.txt to Canvas. If the file already exists, it is
+% overwritten.
 
 fprintf("--- Starting Upload File Test ---\n")
 
@@ -47,7 +48,7 @@ end
 %
 % Use the Delete Module test to remove all created assets
 
-fprintf("--- Starting Creation/Delete Module Test ---\n")
+fprintf("--- Starting Create Module and Module Item Test ---\n")
 
 fprintf("Creating module...\n")
 NewModule = canv.createModule("Test Module 01", "UnlockAt", datetime()+hours(1));
@@ -60,6 +61,8 @@ fprintf("Module item created. Check Canvas.\n")
 
 %% Test Delete Module
 % This test delets a module and items from the Create Module test. 
+
+fprintf("--- Starting Delete Module Test ---\n")
 
 % Search for created module
 createdMod = canv.getModules(Search="Test Module 01");

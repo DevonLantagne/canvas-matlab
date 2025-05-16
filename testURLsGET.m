@@ -86,7 +86,7 @@ end
 %% Get Files in the course
 if true
     fprintf("\n--- Getting Files ---\n")
-    courseFiles = canv.getFiles();
+    [courseFiles, status, resp] = canv.getFiles();
 
     % Display
     for i = 1:length(courseFiles)
