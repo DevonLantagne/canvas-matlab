@@ -10,7 +10,7 @@ fprintf("Canvas API connected!\n")
 
 %% Get Students
 if true
-    fprintf("\n--- Getting Students ---\n")
+    fprintf("\n--- Getting Students ---\n\n")
     students = canv.getStudents(GetAvatar=true);
 
     % Display some basic info
@@ -29,7 +29,7 @@ end
 
 %% Get Assignment Groups
 if true
-    fprintf("\n--- Getting Assignment Groups ---\n")
+    fprintf("\n--- Getting Assignment Groups ---\n\n")
     asmt_grps = canv.getAssignmentGroups();
 
     % Display some basic info
@@ -43,7 +43,7 @@ end
 
 %% Get Assignments
 if true
-    fprintf("\n--- Getting Assignments ---\n")
+    fprintf("\n--- Getting Assignments ---\n\n")
     asmts = canv.getAssignments();
 
     % Display some basic info
@@ -70,7 +70,7 @@ end
 
 %% Get Folders in the course
 if true
-    fprintf("\n--- Getting Folders ---\n")
+    fprintf("\n--- Getting Folders ---\n\n")
     courseFolders = canv.getFolders();
 
     % Display
@@ -85,7 +85,7 @@ end
 
 %% Get Files in the course
 if true
-    fprintf("\n--- Getting Files ---\n")
+    fprintf("\n--- Getting Files ---\n\n")
     [courseFiles, status, resp] = canv.getFiles();
 
     % Display
@@ -98,7 +98,7 @@ end
 
 %% Get Modules
 if true
-    fprintf("\n--- Getting Modules ---\n")
+    fprintf("\n--- Getting Modules ---\n\n")
     modules = canv.getModules();
     
     % Display
@@ -112,7 +112,7 @@ end
 
 %% Get Pages
 if true
-    fprintf("\n--- Getting Pages ---\n")
+    fprintf("\n--- Getting Pages ---\n\n")
     pages = canv.getPages();
     
     % Display

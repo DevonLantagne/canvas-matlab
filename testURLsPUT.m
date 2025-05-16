@@ -13,7 +13,7 @@ fprintf("Canvas API connected!\n")
 % Uploads the testFile.txt to Canvas. If the file already exists, it is
 % overwritten.
 
-fprintf("--- Starting Upload File Test ---\n")
+fprintf("--- Starting Upload File Test ---\n\n")
 
 fileInfo = dir("testFile.txt");
 if isempty(fileInfo); error("File not found."); end
@@ -30,7 +30,7 @@ end
 %% File Delete Test
 % Deletes the testFile.txt that was uploaded with the upload test.
 
-fprintf("--- Starting Delete File Test ---\n")
+fprintf("--- Starting Delete File Test ---\n\n")
 
 fprintf("Searching for testFile.txt on Canvas...\n")
 file = canv.getFiles(Search="testFile.txt");
@@ -48,7 +48,7 @@ end
 %
 % Use the Delete Module test to remove all created assets
 
-fprintf("--- Starting Create Module and Module Item Test ---\n")
+fprintf("--- Starting Create Module and Module Item Test ---\n\n")
 
 fprintf("Creating module...\n")
 NewModule = canv.createModule("Test Module 01", "UnlockAt", datetime()+hours(1));
@@ -62,7 +62,7 @@ fprintf("Module item created. Check Canvas.\n")
 %% Test Delete Module
 % This test delets a module and items from the Create Module test. 
 
-fprintf("--- Starting Delete Module Test ---\n")
+fprintf("--- Starting Delete Module Test ---\n\n")
 
 % Search for created module
 createdMod = canv.getModules(Search="Test Module 01");
