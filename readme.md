@@ -1,17 +1,20 @@
 # Canvas Class for MATLAB
 
-This MATLAB class provides a lightweight interface for interacting with the [Canvas LMS REST API](https://canvas.instructure.com/doc/api/) from within MATLAB. It supports secure access using API tokens and provides methods to retrieve course-related data such as students, assignments, and submissions.\
+This MATLAB class provides a lightweight interface for interacting with the
+ [Canvas LMS REST API](https://canvas.instructure.com/doc/api/) from within
+ MATLAB. It supports secure access using API tokens and provides methods to
+ retrieve course-related data such as students, assignments, and 
+submissions.\
 \
 This project is currently under heavy development!
 
 ## Features
 
-- 🧾 Get active students and their enrollment sections
-- 📝 Fetch all assignments and submissions in a course
-- 🔐 Token-based authentication with custom headers
-- 🔍 Debugging output
-- 📡 Automatically handles paginated results from Canvas API
-- 👷 Modular and extensible for additional Canvas API features
+- Get active students and their enrollment sections
+- Fetch all assignments and submissions in a course
+- Add modules and module items.
+- Automatically handles paginated results from Canvas API
+- Modular and extensible for additional Canvas API features
 
 ## Requirements
 
@@ -25,6 +28,9 @@ This project is currently under heavy development!
 Download and place the `Canvas.m` file in your MATLAB path or working directory. That's it! 🍷
 
 ### For Developers
+
+You will want a test instance or test course on Canvas. You can also spin up your own
+containerized instance of Canvas using Docker.
 
 First, clone the repo. You can also execute from MATLAB by adding ! before the command.
 
@@ -44,7 +50,7 @@ Log into your Canvas account, go to your account settings, and generate a new ac
 
 Navigate to the Canvas course you would like to interface. Check the URL in your browser and find the number after "courses" - this is the Course ID.
 
-### 3. Create a Canvas object
+### 3. Create a Canvas object in MATLAB
 
 ```matlab
 % Canvas(baseURL, API_Token, CourseID)
@@ -55,9 +61,7 @@ If no errors occur, the `api` variable will be the interface object. You can cal
 
 ## Notes
 
-- Currently, only GET endpoints are supported.
-- POST/PUT methods such as `sendGrade` are stubbed and not functional (to avoid accidental data modifications).
-- This is intended for internal use (e.g., grade audits, reporting) rather than real-time LMS modifications.
+- Currently, only GET endpoints are supported and posting grades is under development.
 
 ## Security
 
@@ -68,68 +72,20 @@ If no errors occur, the `api` variable will be the interface object. You can cal
 Use MATLAB's build-in docstring viewer to get help on any method or property.
 ```matlab
 doc Canvas
+doc Canvas.getStudents
+% Or use the help command
+help Canvas
+help Canvas.getStudents
 ```
+
+Most methods return structures defined by the Canvas API which can be found
+[here](https://developerdocs.instructure.com/services/canvas/file.all_resources).
 
 ### Methods
 You can call methods from the interface object you created earlier. For example:
 ```matlab
 StudentList = api.getStudents();
+% or
+StudentList = getStudents(api);
 ```
-
-#### `getStudents(opts)`: 
-Get a list of students in the course.
-```matlab
-StudentList = api.getStudents();
-```
-Optional `GetAvatar` includes avatar URLs in the output.
-```matlab
-StudentList = api.getStudents(GetAvatar=true);
-```
-
-#### `getAssignmentGroups()`:
-Lists all assignment groups (e.g. Homework, Quizzes, Exams...) and their weights toward the final grade.
-```matlab
-asmtGrps = api.getAssignmentGroups();
-```
-
-#### `getAssignments()`:
-Retrieve all course assignments. This does not include any student performance.
-```matlab
-asmts = api.getAssignments();
-```
-
-#### `getAssignment(assignmentID)`:
-Retrieve a particular course assignment. This does not include any student performance.\
-Use `getAssignments()` to get the list of assignment IDs.
-```matlab
-asmt = api.getAssignment(12345);
-```
-
-#### `getSubmissions(assignmentID)`:
-Retrieve all submissions for an assignment. This includes comments of instructors and students as well as a ledger of all submitted content.\
-Use `getAssignments()` to get the list of assignment IDs.
-```matlab
-asmt = api.getSubmissions(12345);
-```
-
-#### `downloadSubmissions(assignmentID, downloadsPath)`:
-Download all submission attachments for an assignment. This includes comments of instructors and students as well as all submitted content.\
-`downloadsPath` is a path on your computer to place the downloaded content. If the path does not exist, it will be created.
-Within the `downloadsPath`, a new folder will be created for each student. All files of all submission attempts will be downloaded to the student's folder. Files will be prepended with "attemptX_" for the attempt number. The students folder will contain:
-- `empty.txt` if the student did not submit anything.
-- `attempt1 LATE (X hours).txt` if the student submitted late.
-- `comments.txt` for all instructor and student comments.
-- `attemptX_filename.ext` for all attached files.
-
-Files that already exist will not be modified except for `comments.txt`.\
-Use `getAssignments()` to get the list of assignment IDs.
-```matlab
-api.downloadSubmissions(12345, "C:\MyFilePath\AssignmentFolder");
-```
-You can also filter the downloads by section numbers:
-```matlab
-api.downloadSubmissions(12345, "C:\MyFilePath\Assignment1", Sections=["001", "002"]);
-```
-
-
-
+Consult the MATLAB `help` or `doc` functions for more information for each method.

@@ -4,28 +4,52 @@ classdef Canvas
     %   using the public REST API. You can retrieve data such as students, assignments,
     %   and post grades using authenticated HTTP requests.
     %
-    %   obj = Canvas(baseURL, token, courseID) creates a new Canvas API object.
+    %   Structures returned by Canvas methods mirror those described in the
+    %   <a href="matlab: web('https://developerdocs.instructure.com/services/canvas/file.all_resources')">Canvas LMS API documentation</a>
     %
-    %   INPUTS:
-    %       baseURL  - Base URL of the Canvas instance (e.g., "https://canvas.instructure.com/api/v1")
-    %       token    - Canvas API access token (string)
-    %       courseID - Canvas course ID (string)
+    %   api = Canvas(baseURL, token, courseID) creates a new Canvas API object.
     %
-    %   OPTIONAL NAME-VALUE ARGUMENTS:
-    %       debug    - Logical flag to enable verbose debug printing
+    %   Inputs:
+    %       baseURL  - [string] Base URL of the Canvas instance (e.g.,
+    %                  "https://yourinstitution.instructure.com/api/v1").
+    %       token    - [string] Canvas API access token.
+    %                  You can generate this token from your Canvas user
+    %                  settings.
+    %       courseID - [string] Canvas course ID.
+    %
+    %   Optional Inputs (name,value pairs):
+    %       debug    - [default = false] Logical flag to enable verbose debug printing
+    %
+    %   Output:
+    %       A Canvas object connected to the specified course.
 
-    properties
+    properties (Access = public)
         %COURSENAME Name of the course from Canvas
+        %   COURSENAME is automatically populated on object construction by
+        %   using the name provided by Canvas. You can overwrite this name
+        %   after construction.
         courseName
 
         %COURSECODE Canvas course code of the course
+        %   COURSECODE is the university-specified course name/code that
+        %   you might find in your course catalog. This is automatically
+        %   populated on object construction but can be overwritten after
+        %   construction.
         courseCode
 
         %DEBUG Enable verbose debug printing
         %   If true, API requests and rate limit details are printed to the console.
+        %   Default is FALSE.
         debug (1,1) logical = false
 
         %PERPAGE Sets the number of items per API call before paging
+        %   The Canvas API utilizes paging for large lists of data which
+        %   requires API calls for each page. PERPAGE sets the number of
+        %   items returned per page. Setting to 100 would return 100 items
+        %   (i.e., assignments or students) before another API call would
+        %   occur. The Canvas.m class will combine all pages together for
+        %   one output; you do not have to call the methods multiple times.
+        %
         %   Must be a value between 10 and 100 (default is 100).
         perPage (1,1) uint8 {mustBeNumeric, mustBeInRange(perPage,10,100)} = 100
     end
@@ -35,6 +59,9 @@ classdef Canvas
         baseURL (1,1) string
 
         %COURSEID The Canvas course identifier
+        %   COURSEID is the course ID from Canvas. You can find this on
+        %   Canvas by reading your URL when visiting the course. You will
+        %   find this course ID after the /course/ in the URL.
         courseID (1,1) string
     end
 
@@ -45,7 +72,6 @@ classdef Canvas
     properties (Access = private, Hidden)
         %TOKEN Bearer token used for authentication
         token (1,1) string
-
         authHeader
     end
 
@@ -62,10 +88,11 @@ classdef Canvas
         function obj = Canvas(baseURL, token, courseID, opts)
             %CANVAS Construct a Canvas API interface object
             %   obj = Canvas(baseURL, token, courseID) initializes a connection to
-            %   a Canvas course using the provided API token.
+            %   a Canvas course using the provided API token and course ID.
             %
             %   Optional:
-            %       opts.debug - enable verbose printing of requests (default: false)
+            %       debug - [logical, default=false] enable verbose
+            %               printing of requests.
 
             arguments
                 baseURL (1,1) string
@@ -113,14 +140,41 @@ classdef Canvas
     %% GET Methods
     methods
         function out = get.perPage(obj)
+            % @ignore
             out = num2str(obj.perPage);
         end
     end
 
     %% HTTP Methods
-    methods
+    methods (Access = public)
         % Course
         function [course, status, resp] = getCourse(obj)
+            %getCourse Returns a Canvas course structure containing information about the course.
+            %   Description:
+            %       Returns a course structure from the Canvas API.
+            %
+            %   Syntax:
+            %       [course, status, resp] = getCourse(api)
+            %
+            %   Inputs:
+            %       obj - the Canvas API object.
+            %
+            %   Outputs:
+            %       course -  struct of course information.
+            %       status -  HTTP status code of the API call.
+            %       resp -  full HTTP response from the API.
+            %
+            %   Examples:
+            %
+            %       Get the course structure:
+            %       courseInfo = api.getCourse;
+            %
+            %       Get the course structure and HTTP response code:
+            %       [courseInfo, status] = api.getCourse;
+            %
+            %       Only get the raw HTTP response:
+            %       [~,~,resp] = api.getCourse;
+
             url = buildURL(obj);
             [course, status, resp] = getPayload(obj, url);
             course = Chars2StringsRec(course);
