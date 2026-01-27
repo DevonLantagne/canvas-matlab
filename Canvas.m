@@ -80,6 +80,9 @@ classdef Canvas
             'Accept', 'application/json')
         formHeader = matlab.net.http.field.ContentTypeField(...
             'application/x-www-form-urlencoded')
+        % Token Management
+        credTarget = 'CanvasMATLAB'
+        credUserName = 'CanvasAPIToken'
     end
 
 
@@ -1030,11 +1033,187 @@ classdef Canvas
 
             [moduleItem, status, resp] = putPayload(obj, url, form);
         end
+
+    end
+
+    methods(Static)
+
+        function init()
+            %INIT Initializes local data and token for future CLI calls.
+            % Calling .init() again will show current settings and offer to
+            % enter new ones.
+            %
+            % Init will prompt the user (via GUI dialogs) for:
+            %   Canvas URL (saved to config)
+            %   Canvas API Token (saved to secrets)
+
+            disp("Starting Canvas-MATLAB initialization...")
+
+            % Detect OS (order matters - macOS is also isunix)
+            if ismac
+                % Code to run on Mac platform
+                disp('Token storage not yet supported')
+            elseif isunix
+                % Code to run on Linux platform
+            elseif ispc
+                % Code to run on Windows platform
+            else
+                disp('Platform not supported')
+            end
+
+            % Check if config already exists, if so load it as defaults for
+            % prompts.
+
+            % TODO
+
+            defaultUrl = "yourschool.instructure.com";
+
+            promptStr = sprintf("Enter the Canvas institution URL [%s]", defaultUrl);
+            url = input(promptStr, "s");
+            % append API url info:
+            url = "https://" + url + "/api/v1";
+
+            % Prompt for token
+
+
+        end
     
+    end
+
+    methods (Static, Access = private)
+        % Token Management
+        function token = tokenGet()
+            % Obtains the token stored on the device. Will first check
+            % credential managers and then local secrets.json. If no
+            % credential or secrets file exists, this function returns [],
+            % otherwise the token is a string.
+
+            % Local Storate per OS:
+            %   Windows: %APPDATA%\CanvasMATLAB\
+            %   macOS: ~/Library/Application Support/CanvasMATLAB/
+            %   Linux: $XDG_CONFIG_HOME/CanvasMATLAB/
+
+            token = []; % default
+
+            % Check Credential Manager Tools
+
+            if ismac
+                % Check the 'secrets' service
+                disp('secrets service not yet implemented')
+
+            elseif isunix
+                % Don't even bother with a credential manager for now. Only
+                % use secrets.json
+            elseif ispc
+                % Use Windows Credential Manager (via Powershell)
+                cmd = [
+                    'powershell -NoProfile -Command ' ...
+                    '"Try { ' ...
+                    '$cred = Get-StoredCredential -Target ''' Canvas.credTarget '''; ' ...
+                    'if ($cred -eq $null) { exit 1 }; ' ...
+                    '$cred.Password ' ...
+                    '} Catch { exit 2 }"'
+                ];
+                [status, output] = system(cmd);
+                if status == 0
+                    token = strtrim(output);
+                    return
+                end
+            else
+                disp('Platform not supported')
+            end
+
+            % Check secrets.json
+
+        end
+
+        function goodSave = tokenSave(token)
+            % First tries to save the token to an OS cred manager. If
+            % fails, tries to save token in secrets.json.
+            %
+            % If a target token already exists, it is overwritten!!
+            %
+            % Returns true for good save.
+
+            token = string(token);
+
+            if ismac
+                % Check the 'secrets' service
+                disp('secrets service not yet implemented')
+
+            elseif isunix
+                % Don't even bother with a credential manager for now. Only
+                % use secrets.json
+            elseif ispc
+                % Use Windows Credential Manager (via Powershell)
+                cmd = [
+                    'powershell -NoProfile -Command ' ...
+                    '"Try { ' ...
+                    'New-StoredCredential ' ...
+                    '-Target ''' Canvas.credTarget ''' ' ...
+                    '-UserName ''' Canvas.credUserName ''' ' ...
+                    '-Password ''' token ''' ' ...
+                    '-Persist LocalMachine | Out-Null ' ...
+                    '} Catch { exit 1 }"'
+                ];
+                status = system(cmd);
+                if status ~= 0
+                    goodSave = false;
+                    disp('Failed to store Canvas token in Windows Credential Manager.');
+                else
+                    goodSave = true;
+                end
+                
+            else
+                disp('Platform not supported')
+            end
+
+        end
+
+        function goodRemove = tokenRemove()
+            % Removes tokens from host system (cred managers and
+            % secrets.json).
+
+            if ismac
+                % Check the 'secrets' service
+                disp('secrets service not yet implemented')
+                goodRemove = false;
+
+            elseif isunix
+                % Don't even bother with a credential manager for now. Only
+                % use secrets.json
+                goodRemove = false;
+
+            elseif ispc
+                % Use Windows Credential Manager (via Powershell)
+                cmd = [
+                    'powershell -NoProfile -Command ' ...
+                    '"Try { ' ...
+                    'Remove-StoredCredential -Target ''' Canvas.credTarget ''' -ErrorAction Stop ' ...
+                    '} Catch { exit 1 }"'
+                ];
+            
+                status = system(cmd);
+            
+                if status ~= 0
+                    warning('No Canvas credential found to delete.');
+                    goodRemove = false;
+                else
+                    goodRemove = true;
+                end
+                
+            else
+                disp('Platform not supported')
+                goodRemove = false;
+            end
+
+        end
+        
     end
 
     %% Private
     methods (Access = private)
+
         % Utility
         function printdb(obj, message)
             if obj.debug
@@ -1489,4 +1668,40 @@ elseif ischar(data)
     data = string(data);
 end
 % Leave other data types (numeric, logical, etc.) untouched
+end
+
+function path = localSavePath()
+% Return per-user configuration directory for CanvasMATLAB
+
+SaveFolder = 'CanvasMATLAB';
+
+if ispc
+    base = getenv('APPDATA');
+    if isempty(base)
+        error('APPDATA environment variable not set.');
+    end
+
+elseif ismac
+    home = getenv('HOME');
+    if isempty(home)
+        error('HOME environment variable not set.');
+    end
+    base = fullfile(home, 'Library', 'Application Support');
+
+elseif isunix
+    base = getenv('XDG_CONFIG_HOME');
+    if isempty(base)
+        home = getenv('HOME');
+        if isempty(home)
+            error('Neither XDG_CONFIG_HOME nor HOME are set.');
+        end
+        base = fullfile(home, '.config');
+    end
+
+else
+    error('Unsupported platform.');
+end
+
+path = fullfile(base, SaveFolder);
+
 end
